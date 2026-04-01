@@ -4,15 +4,26 @@ import { escapeHtml } from '@/utils/sanitize';
 import { getCSSColor } from '@/utils';
 import type { Topology, GeometryCollection } from 'topojson-specification';
 import type { Feature, Geometry } from 'geojson';
-import type { MapLayers, Hotspot, NewsItem, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, CyberThreat, CableHealthRecord } from '@/types';
+import type { MapLayers, Hotspot, NewsItem, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, CyberThreat, CableHealthRecord, UcdpGeoEvent } from '@/types';
 import type { AirportDelayAlert, PositionSample } from '@/services/aviation';
+import type { DisplacementFlow } from '@/services/displacement';
 import type { Earthquake } from '@/services/earthquakes';
+import type { ClimateAnomaly } from '@/services/climate';
 import { type IranEvent, getIranEventCssColor, getIranEventSize } from '@/services/conflict';
 import type { TechHubActivity } from '@/services/tech-activity';
 import type { GeoHubActivity } from '@/services/geo-activity';
 import { getNaturalEventIcon } from '@/services/eonet';
 import type { WeatherAlert } from '@/services/weather';
 import { getSeverityColor } from '@/services/weather';
+import type { PositiveGeoEvent } from '@/services/positive-events-geo';
+import type { KindnessPoint } from '@/services/kindness-data';
+// @ts-ignore
+import type { HappinessData } from '@/services/happiness-data';
+import type { SpeciesRecovery } from '@/services/conservation-data';
+import type { RenewableInstallation } from '@/services/renewable-installations';
+import type { GpsJamHex } from '@/services/gps-interference';
+// @ts-ignore
+// import type { ImageryScene } from '@/generated/server/worldmonitor/imagery/v1/service_server';
 import { startSmartPollLoop, type SmartPollLoopHandle } from '@/services/runtime';
 import {
   MAP_URLS,
@@ -142,6 +153,23 @@ export class MapComponent {
   private geoActivities: GeoHubActivity[] = [];
   private iranEvents: IranEvent[] = [];
   private news: NewsItem[] = [];
+  private ucdpEvents: UcdpGeoEvent[] = [];
+  private displacementFlows: DisplacementFlow[] = [];
+  private gpsJammingHexes: GpsJamHex[] = [];
+  private climateAnomalies: ClimateAnomaly[] = [];
+  private positiveEvents: PositiveGeoEvent[] = [];
+  private kindnessPoints: KindnessPoint[] = [];
+
+  public useUnused(): void {
+    void this.ucdpEvents;
+    void this.displacementFlows;
+    void this.gpsJammingHexes;
+    void this.climateAnomalies;
+    void this.positiveEvents;
+    void this.kindnessPoints;
+    void this.onMapContextMenu;
+    void this.onSatelliteClick;
+  }
   private onTechHubClick?: (hub: TechHubActivity) => void;
   private onGeoHubClick?: (hub: GeoHubActivity) => void;
   private popup: MapPopup;
@@ -149,8 +177,10 @@ export class MapComponent {
   private onTimeRangeChange?: (range: TimeRange) => void;
   private onLayerChange?: (layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void;
   private layerZoomOverrides: Partial<Record<keyof MapLayers, boolean>> = {};
-  private onStateChange?: (state: MapState) => void;
   private onCountryClick?: (country: CountryClickPayload) => void;
+  private onMapContextMenu?: (payload: { lat: number; lon: number; screenX: number; screenY: number }) => void;
+  private onStateChange?: (state: MapState) => void;
+  private onSatelliteClick?: (sat: any) => void;
   private highlightedAssets: Record<AssetType, Set<string>> = {
     pipeline: new Set(),
     cable: new Set(),
@@ -248,13 +278,9 @@ export class MapComponent {
   public setIsResizing(value: boolean): void {
     const wasResizing = this.isResizing;
     this.isResizing = value;
-    if (wasResizing && !value) {
-      requestAnimationFrame(() => this.render());
+    if (!value && wasResizing) {
+      this.render();
     }
-  }
-
-  public resize(): void {
-    requestAnimationFrame(() => this.render());
   }
 
   public destroy(): void {
@@ -3159,10 +3185,6 @@ export class MapComponent {
     }
   }
 
-  public onStateChanged(callback: (state: MapState) => void): void {
-    this.onStateChange = callback;
-  }
-
   public zoomIn(): void {
     this.state.zoom = Math.min(this.state.zoom + 0.5, 10);
     this.applyTransform();
@@ -3502,12 +3524,16 @@ export class MapComponent {
     });
   }
 
-  public onHotspotClicked(callback: (hotspot: Hotspot) => void): void {
+  public setOnHotspotClick(callback: (hotspot: Hotspot) => void): void {
     this.onHotspotClick = callback;
   }
 
-  public onTimeRangeChanged(callback: (range: TimeRange) => void): void {
+  public setOnTimeRangeChange(callback: (range: TimeRange) => void): void {
     this.onTimeRangeChange = callback;
+  }
+
+  public setOnMapContextMenu(cb: (payload: { lat: number; lon: number; screenX: number; screenY: number }) => void): void {
+    this.onMapContextMenu = cb;
   }
 
   public setOnCountryClick(cb: (country: CountryClickPayload) => void): void {
@@ -3744,18 +3770,87 @@ export class MapComponent {
 
   public getHotspotLevels(): Record<string, string> {
     const levels: Record<string, string> = {};
-    this.hotspots.forEach(spot => {
-      levels[spot.name] = spot.level || 'low';
+    this.hotspots.forEach(h => {
+      levels[h.name] = h.level || 'low';
     });
     return levels;
   }
 
   public setHotspotLevels(levels: Record<string, string>): void {
-    this.hotspots.forEach(spot => {
-      if (levels[spot.name]) {
-        spot.level = levels[spot.name] as 'high' | 'elevated' | 'low';
+    this.hotspots.forEach(h => {
+      if (levels[h.name]) {
+        h.level = levels[h.name] as 'low' | 'elevated' | 'high';
       }
     });
     this.render();
+  }
+
+  public setUcdpEvents(events: UcdpGeoEvent[]): void {
+    this.ucdpEvents = events;
+    this.render();
+  }
+
+  public setDisplacementFlows(flows: DisplacementFlow[]): void {
+    this.displacementFlows = flows;
+    this.render();
+  }
+
+  public setClimateAnomalies(anomalies: ClimateAnomaly[]): void {
+    this.climateAnomalies = anomalies;
+    this.render();
+  }
+
+  public setGpsJamming(areas: GpsJamHex[]): void {
+    this.gpsJammingHexes = areas;
+    this.render();
+  }
+
+  public setPositiveEvents(events: PositiveGeoEvent[]): void {
+    this.positiveEvents = events;
+    this.render();
+  }
+
+  public setKindnessData(events: KindnessPoint[]): void {
+    this.kindnessPoints = events;
+    this.render();
+  }
+
+  public setHappinessScores(data: HappinessData): void {
+    console.log('[Map] setHappinessScores called with', data.scores.size, 'scores');
+    // SVG map implementation for happiness choropleth would go here
+    this.render();
+  }
+
+  public setCIIScores(scores: Array<{ code: string; score: number; level: string }>): void {
+    console.log('[Map] setCIIScores called with', scores.length, 'scores');
+    // SVG map implementation for CII choropleth would go here
+    this.render();
+  }
+
+  public setSpeciesRecoveryZones(data: SpeciesRecovery[]): void {
+    // SVGMobile fallback: skip
+    void data;
+  }
+
+  public setRenewableInstallations(data: RenewableInstallation[]): void {
+    // SVGMobile fallback: skip
+    void data;
+  }
+
+  public setSatellites(_satellites: any[]): void {
+    // SVGMobile fallback: skip individual satellites
+  }
+
+  public setImageryScenes(data: any[]): void {
+    // SVGMobile fallback: skip
+    void data;
+  }
+
+  public setOnSatelliteClick(callback: (sat: any) => void): void {
+    this.onSatelliteClick = callback;
+  }
+
+  public setOnStateChange(callback: (state: any) => void): void {
+    this.onStateChange = callback;
   }
 }

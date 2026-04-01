@@ -1,11 +1,20 @@
 /**
  * DeckGLMap - WebGL-accelerated map visualization for desktop
- * Uses deck.gl for high-performance rendering of large datasets
- * Mobile devices gracefully degrade to the D3/SVG-based Map component
  */
+// @ts-ignore
+window.__publicField = window.__publicField || function(obj, key, value) {
+  if (typeof key === 'symbol') {
+    obj[key] = value;
+  } else {
+    Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true });
+  }
+  return value;
+};
+
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer, PolygonLayer } from '@deck.gl/layers';
+import { TerrainLayer } from '@deck.gl/geo-layers';
 import maplibregl from 'maplibre-gl';
 import { registerPMTilesProtocol, FALLBACK_DARK_STYLE, FALLBACK_LIGHT_STYLE, getMapProvider, getMapTheme, getStyleForProvider, isLightMapTheme } from '@/config/basemap';
 import Supercluster from 'supercluster';
@@ -47,6 +56,7 @@ import type { DisplacementFlow } from '@/services/displacement';
 import type { Earthquake } from '@/services/earthquakes';
 import type { ClimateAnomaly } from '@/services/climate';
 import { ArcLayer } from '@deck.gl/layers';
+import type { SatellitePosition } from '@/services/satellites';
 import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
 import { PathStyleExtension } from '@deck.gl/extensions';
@@ -167,6 +177,9 @@ const HAPPY_DARK_STYLE = '/map-styles/happy-dark.json';
 const HAPPY_LIGHT_STYLE = '/map-styles/happy-light.json';
 const isHappyVariant = SITE_VARIANT === 'happy';
 
+// Theme-aware basemap vector style URLs (English labels, no local scripts)
+// v0.2.2-alpha: Migrated to self-hosted Protomaps (PMTiles)
+
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Zoom-dependent layer visibility and labels
 const LAYER_ZOOM_THRESHOLDS: Partial<Record<keyof MapLayers, { minZoom: number; showLabels?: number }>> = {
@@ -286,6 +299,7 @@ function ensureClosedRing(ring: [number, number][]): [number, number][] {
 export class DeckGLMap {
   private static readonly MAX_CLUSTER_LEAVES = 200;
 
+
   private container: HTMLElement;
   private deckOverlay: MapboxOverlay | null = null;
   private maplibreMap: maplibregl.Map | null = null;
@@ -342,6 +356,7 @@ export class DeckGLMap {
   private speciesRecoveryZones: Array<SpeciesRecovery & { recoveryZone: { name: string; lat: number; lon: number } }> = [];
   private renewableInstallations: RenewableInstallation[] = [];
   private countriesGeoJsonData: FeatureCollection<Geometry> | null = null;
+  private satellites: SatellitePosition[] = [];
   private conflictZoneGeoJson: GeoJSON.FeatureCollection | null = null;
 
   // CII choropleth data
@@ -371,6 +386,7 @@ export class DeckGLMap {
   private onLayerChange?: (layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void;
   private onStateChange?: (state: DeckMapState) => void;
   private onAircraftPositionsUpdate?: (positions: PositionSample[]) => void;
+  private onSatelliteClick?: (sat: any) => void;
 
   // Highlighted assets
   private highlightedAssets: Record<AssetType, Set<string>> = {
@@ -422,6 +438,7 @@ export class DeckGLMap {
   private lastAircraftFetchCenter: [number, number] | null = null;
   private lastAircraftFetchZoom = -1;
   private aircraftFetchSeq = 0;
+  public is3DMode: boolean = false;
 
   constructor(container: HTMLElement, initialState: DeckMapState) {
     this.container = container;
@@ -562,6 +579,8 @@ export class DeckGLMap {
       renderWorldCopies: false,
       attributionControl: false,
       interactive: true,
+      // Localized basemaps for Abu Dhabi operations (March 4th updates)
+      // v0.2.2-alpha uses localized labels in the style configuration
       ...(MAP_INTERACTION_MODE === 'flat'
         ? {
           maxPitch: 0,
@@ -668,12 +687,57 @@ export class DeckGLMap {
         const clampedLat = Math.max(-90, Math.min(90, c.lat + delta));
         this.maplibreMap.jumpTo({ center: [c.lng, clampedLat] });
         this.correctingCenter = false;
+        try {
+          // If we shift while rotating/pitching, deck.gl can lag behind natively
+          this.maplibreMap.resize();
+        } catch { /* ignore */ }
         // Do NOT update savedTopLat — keep the original mousedown position
         // so every frame targets the exact same geographic anchor.
       }
     });
 
     this.container.addEventListener('contextmenu', this.handleContextMenu);
+  }
+
+  public toggle3DMode(): boolean {
+    this.is3DMode = !this.is3DMode;
+    const pitch = this.is3DMode ? 60 : 0;
+
+    // Animate maplibre camera
+    if (this.maplibreMap) {
+      this.maplibreMap.easeTo({ pitch, duration: 1000 });
+
+      // Toggle native maplibre 3d-buildings if supported by the basemap
+      if (this.is3DMode) {
+        if (!this.maplibreMap.getLayer('3d-buildings')) {
+          try {
+            this.maplibreMap.addLayer({
+              'id': '3d-buildings',
+              'source': 'carto',
+              'source-layer': 'building',
+              'type': 'fill-extrusion',
+              'minzoom': 14,
+              'paint': {
+                'fill-extrusion-color': getCurrentTheme() === 'dark' ? '#2A3848' : '#e0e0e0',
+                'fill-extrusion-height': ['get', 'render_height'],
+                'fill-extrusion-base': ['get', 'render_min_height'],
+                'fill-extrusion-opacity': 0.8
+              }
+            }, 'waterway'); // Insert right above water/waterway if possible
+          } catch (e) {
+            console.warn('[DeckGLMap] Native 3D buildings could not be added:', e);
+          }
+        }
+        this.maplibreMap.setLayoutProperty('3d-buildings', 'visibility', 'visible');
+      } else {
+        if (this.maplibreMap.getLayer('3d-buildings')) {
+          this.maplibreMap.setLayoutProperty('3d-buildings', 'visibility', 'none');
+        }
+      }
+    }
+
+    this.render(); // force re-render for deckgl TerrainLayer
+    return this.is3DMode;
   }
 
   private initDeck(): void {
@@ -1200,6 +1264,25 @@ export class DeckGLMap {
     const filteredMilitaryVesselClusters = mapLayers.military ? this.filterMilitaryVesselClustersByTime(this.militaryVesselClusters) : [];
     // UCDP is a historical dataset (events aged months); time-range filter always zeroes it out
     const filteredUcdpEvents = mapLayers.ucdpEvents ? this.ucdpEvents : [];
+
+    if (this.is3DMode) {
+      layers.push(
+        new TerrainLayer({
+          id: 'terrain-layer',
+          minZoom: 0,
+          maxZoom: 23,
+          strategy: 'no-overlap',
+          elevationDecoder: {
+            rScaler: 256,
+            gScaler: 1,
+            bScaler: 1 / 256,
+            offset: -32768
+          },
+          elevationData: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
+          operation: 'terrain+draw'
+        })
+      );
+    }
 
     // Day/night overlay (rendered first as background)
     if (mapLayers.dayNight) {
@@ -2593,7 +2676,7 @@ export class DeckGLMap {
         return [255, 220, 80, 140] as [number, number, number, number];
       },
       pickable: true,
-      updateTriggers: { getRadius: this.lastSCZoom, getFillColor: this.lastSCZoom },
+      updateTriggers: { getRadius: this.lastSCZoom },
     }));
 
     const multiClusters = this.protestClusters.filter(c => c.count > 1);
@@ -3842,10 +3925,6 @@ export class DeckGLMap {
       </div>
     `;
 
-    const authorBadge = document.createElement('div');
-    authorBadge.className = 'map-author-badge';
-    authorBadge.textContent = '© Elie Habib · Someone™';
-    toggles.appendChild(authorBadge);
 
     this.container.appendChild(toggles);
 
@@ -4009,7 +4088,7 @@ export class DeckGLMap {
         ${helpSection('transport', [
       helpItem(label('shipTraffic'), 'transportShipping'),
       helpItem(label('tradeRoutes'), 'tradeRoutes'),
-      helpItem(label('flightDelays'), 'transportDelays'),
+      helpItem(label('aviation'), 'transportDelays'),
     ])}
         ${helpSection('naturalEconomic', [
       helpItem(label('naturalEvents'), 'naturalEventsFull'),
@@ -4736,10 +4815,16 @@ export class DeckGLMap {
     this.render();
   }
 
+  public setSatellites(satellites: any[]): void {
+    this.satellites = satellites;
+    this.render();
+  }
+
   public setRenewableInstallations(installations: RenewableInstallation[]): void {
     this.renewableInstallations = installations;
     this.render();
   }
+
 
   public updateHotspotActivity(news: NewsItem[]): void {
     this.news = news; // Store for related news lookup
@@ -4852,12 +4937,17 @@ export class DeckGLMap {
     this.onLayerChange = callback;
   }
 
+
   public setOnStateChange(callback: (state: DeckMapState) => void): void {
     this.onStateChange = callback;
   }
 
   public setOnAircraftPositionsUpdate(callback: (positions: PositionSample[]) => void): void {
     this.onAircraftPositionsUpdate = callback;
+  }
+
+  public setOnSatelliteClick(callback: (sat: any) => void): void {
+    this.onSatelliteClick = callback;
   }
 
   public getHotspotLevels(): Record<string, string> {

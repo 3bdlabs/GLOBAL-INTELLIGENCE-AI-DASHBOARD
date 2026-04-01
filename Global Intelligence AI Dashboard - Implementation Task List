@@ -1,0 +1,59 @@
+# Global Intelligence AI Dashboard - Implementation Task List
+
+## v0.1.0-alpha: Baseline (Completed)
+- [x] Integrate Strategic AI Synthesis Panel
+- [x] Configure Docker-to-Host bridge for Ollama
+- [x] Establish versioning and release baseline
+- [x] Branding & Header Branding
+
+## v0.2.0-alpha: Live Data Integration
+- [x] Configure Live Data Sources
+    - [x] Identify required environment variables for OpenSky, AISStream, and ACLED
+    - [x] Create `.env` file with placeholders for API keys
+    - [x] Implement Backend Bridge for OpenSky (Basic Auth)
+    - [x] Update `docker-compose.yml` with Relay service and environment mapping
+- [x] v0.2.1-alpha: AISStream Restoration
+    - [x] Fix .env copy-paste spaces (.trim() added)
+    - [x] Correct BoundingBoxes coordinate format ([Lon, Lat])
+    - [x] Implement immediate connection on startup
+    - [x] Resolve relay container crash (syntax fix)
+    - [x] Verify vessel tracking (Status: Online, >4,700 vessels)
+
+## v0.2.1-alpha: AI Context Bridge & Sync (Completed)
+- [x] Planning v0.2.1-alpha Upgrade
+    - [x] Research OpenSky OAuth2 integration
+    - [x] Research Regional News feeds
+    - [x] Research Infrastructure handlers (Cables, Chokepoints)
+    - [x] Draft AI Context Bridge design
+    - [x] Draft AI Memory persistence design
+- [x] Implementation v0.2.1-alpha Upgrade
+    - [x] Update Versioning (package.json, VERSION, tauri.conf)
+    - [x] Implement AI Context Bridge handler
+    - [x] Integrate Bridge into Strategic Synthesis
+    - [x] Implement AI Memory in StrategicPosturePanel (IntelligencePanel)
+    - [x] Sync RELAY_SHARED_SECRET and RELAY_AUTH_HEADER
+    - [x] Fix modular API routing (404s for supply-chain)
+
+## v0.2.2-alpha: Upstream Sync & Core Infrastructure (In-Progress)
+- [x] Core Infrastructure & Versioning
+    - [x] Update `package.json`, `VERSION`, `tauri.conf.json`, `Cargo.toml` to v0.2.2-alpha
+    - [x] Add `_upstream` sync tag to `package.json`
+    - [x] Add `redis:alpine` to `docker-compose.yml`
+    - [x] Update `.env` with `REDIS_URL=redis://redis:6379`
+    - [x] Clear Vite cache (`node_modules/.vite`) and update `package-lock.json`
+- [x] Selective File Sync (Upstream v2.5.25)
+    - [x] Update `src/services/military-bases.ts` for 120k dataset
+    - [x] Update `server/worldmonitor/cyber/v1/handler.ts`
+    - [x] [PROTECT] `server/worldmonitor/ai-context/v1/handler.ts` (Custom Bridge)
+    - [x] [PROTECT] `src/components/IntelligencePanel.tsx` (Custom Persistence)
+- [x] Map & Globalization
+    - [x] Update `DeckGLMap.ts` for self-hosted Protomaps (PMTiles)
+    - [x] Restore `dark.json` and `light.json` map styles (Fix 404)
+    - [x] Integrate Arabic font rendering and RTL support in CSS
+- [x] Data Reliability (Relay Fixes)
+    - [x] Implement 10m RSS refresh and 20m cache TTL in `ais-relay.cjs`
+- [x] Final Deployment & Verification
+    - [x] Run `docker-compose up -d --build --renew-anon-volumes`
+    - [x] Verify version `v0.2.2-alpha` in UI and headers
+    - [x] Verify localized Arabic labels in Abu Dhabi region
+

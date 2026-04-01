@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "Globale Lage mit KI-Erkenntnissen"
@@ -869,6 +869,7 @@
         "pipelines": "ROHRLEITUNGEN",
         "militaryActivity": "Militärische Aktivität",
         "shipTraffic": "Schiffsverkehr",
+        "aviation": "Luftfahrt",
         "flightDelays": "Flugverspätungen",
         "protests": "Proteste",
         "ucdpEvents": "UCDP-Ereignisse",

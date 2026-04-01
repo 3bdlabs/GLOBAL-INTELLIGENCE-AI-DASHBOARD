@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "Informations détaillées et données pour des pays spécifiques."
@@ -1000,6 +1000,7 @@
         "pipelines": "OLÉODUCS ET GAZODUCS",
         "militaryActivity": "Activité militaire",
         "shipTraffic": "Trafic maritime",
+        "aviation": "Aviation",
         "flightDelays": "Retards de vols",
         "protests": "Manifestations",
         "ucdpEvents": "Événements UCDP",

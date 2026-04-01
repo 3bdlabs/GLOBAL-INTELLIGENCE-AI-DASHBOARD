@@ -1,0 +1,41 @@
+# Walkthrough: v0.2.1-alpha Strategic Intelligence Refresh
+
+The dashboard has been upgraded to `v0.2.1-alpha`, introducing a live "AI Context Bridge" and persistent strategic memory.
+
+## Key Accomplishments
+
+### 👁️‍🗨️ AI Context Bridge (Subsurface Ingestion)
+The Strategic AI Synthesis now "knows" more than just numbers. It actively aggregates regional news headlines and infrastructure health data.
+- **Regional News**: Ingests headlines from the Middle East, Europe, Asia, and more.
+- **Infrastructure Status**: Tracks submarine cables and maritime chokepoints.
+- **AI Influence**: This live data is fed into the system prompt for Ollama/GPT to influence risk scores and strategy.
+
+### 💾 Strategic Persistence
+The AI no longer resets its "memory" after a refresh.
+- **Synthesis History**: The last generated strategic synthesis is cached in `localStorage` and restored immediately on boot.
+- **Seamless Transition**: Shows "Standby" or previous context while "Acquiring Data" occurs in the background.
+
+### 🔒 Strategic Synchronization
+Enhanced security and rate-limiting for data relay.
+- **Auth Sync**: `RELAY_AUTH_HEADER` and `RELAY_SHARED_SECRET` are now fully synchronized between the backend and the Railway relay.
+- **OpenSky OAuth2**: Active high-rate flight tracking using `OPENSKY_CLIENT_ID` and `OPENSKY_CLIENT_SECRET`.
+
+## Changes Summary
+
+### Versioning
+- [package.json](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/package.json) updated to `0.2.1-alpha`.
+- [VERSION](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/VERSION) updated.
+- [tauri.conf.json](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src-tauri/tauri.conf.json) updated.
+
+### Backend
+- **[NEW] [handler.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/server/worldmonitor/ai-context/v1/handler.ts)**: The Context Bridge aggregator.
+- **[MODIFY] [strategic-synthesis.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/server/strategic-synthesis.ts)**: Integrates the live bridge context into the AI's core logic.
+
+### Frontend
+- **[MODIFY] [IntelligencePanel.tsx](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/components/IntelligencePanel.tsx)**: Implemented persistence logic and removed mock data handlers.
+
+## Verification Results
+
+- ✅ **API Synchronization**: Verified relay authentication headers match the environment configuration.
+- ✅ **Data Flow**: Confirmed the bridge successfully pulls from `listFeedDigest` and `getCableHealth`.
+- ✅ **Persistence**: Verified `localStorage` stores and restores synthesis objects correctly.

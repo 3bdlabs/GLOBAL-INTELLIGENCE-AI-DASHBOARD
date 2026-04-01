@@ -12,14 +12,12 @@ import {
   FAA_AIRPORTS,
   DELAY_SEVERITY_THRESHOLDS,
 } from '../../../../src/config/airports';
-import { CHROME_UA } from '../../../_shared/constants';
+import { CHROME_UA, getRelayBaseUrl, getRelayHeaders } from '../../../_shared/constants';
+export { CHROME_UA, getRelayBaseUrl, getRelayHeaders };
 import { cachedFetchJson, getCachedJson } from '../../../_shared/redis';
 
 /**
  * Defensive parser for repeated-string query params.
- * The sebuf codegen assigns `params.get("airports")` (a string) to a field
- * typed as `string[]`.  At runtime `req.airports` may therefore be a
- * comma-separated string rather than an actual array.
  */
 export function parseStringArray(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.filter(Boolean);
@@ -380,25 +378,7 @@ export interface NotamClosureResult {
   notamsByIcao: Map<string, string>;
 }
 
-export function getRelayBaseUrl(): string | null {
-  const relayUrl = process.env.WS_RELAY_URL;
-  if (!relayUrl) return null;
-  return relayUrl
-    .replace('wss://', 'https://')
-    .replace('ws://', 'http://')
-    .replace(/\/$/, '');
-}
-
-export function getRelayHeaders(_extra: Record<string, string> = {}): Record<string, string> {
-  const headers: Record<string, string> = { 'User-Agent': CHROME_UA };
-  const relaySecret = process.env.RELAY_SHARED_SECRET;
-  if (relaySecret) {
-    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
-    headers[relayHeader] = relaySecret;
-    headers.Authorization = `Bearer ${relaySecret}`;
-  }
-  return headers;
-}
+// Relay helpers removed - using centralized ones from ../../../_shared/constants
 
 export async function fetchNotamClosures(
   airports: MonitoredAirport[]

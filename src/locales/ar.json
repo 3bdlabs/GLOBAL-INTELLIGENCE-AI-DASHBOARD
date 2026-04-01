@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "مراقب العالم",
     "description": "الوضع العالمي مع رؤى الذكاء الاصطناعي"
@@ -1000,6 +1000,7 @@
         "pipelines": "خطوط أنابيب",
         "militaryActivity": "نشاط عسكري",
         "shipTraffic": "حركة السفن",
+        "aviation": "الطيران",
         "flightDelays": "تأخيرات الرحلات",
         "protests": "احتجاجات",
         "ucdpEvents": "أحداث UCDP",

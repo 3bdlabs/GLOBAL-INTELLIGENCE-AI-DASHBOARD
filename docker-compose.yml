@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OPENSKY_USERNAME=${OPENSKY_USERNAME}
+      - OPENSKY_PASSWORD=${OPENSKY_PASSWORD}
+      - OPENSKY_CLIENT_ID=${OPENSKY_CLIENT_ID}
+      - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET}
+      - AISSTREAM_API_KEY=${AISSTREAM_API_KEY}
+      - ACLED_ACCESS_TOKEN=${ACLED_ACCESS_TOKEN}
+      - RELAY_SHARED_SECRET=${RELAY_SHARED_SECRET}
+      - RELAY_AUTH_HEADER=${RELAY_AUTH_HEADER}
+      - LOCAL_API_MODE=${LOCAL_API_MODE}
+      - WS_RELAY_URL=http://relay:3004
+      - REDIS_URL=${REDIS_URL}
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+    depends_on:
+      - relay
+      - redis
+
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: node scripts/ais-relay.cjs
+    ports:
+      - "3004:3004"
+    environment:
+      - AISSTREAM_API_KEY=${AISSTREAM_API_KEY}
+      - OPENSKY_USERNAME=${OPENSKY_USERNAME}
+      - OPENSKY_PASSWORD=${OPENSKY_PASSWORD}
+      - OPENSKY_CLIENT_ID=${OPENSKY_CLIENT_ID}
+      - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET}
+      - RELAY_SHARED_SECRET=${RELAY_SHARED_SECRET}
+      - REDIS_URL=${REDIS_URL}
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+      - ALLOW_UNAUTHENTICATED_RELAY=false
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+

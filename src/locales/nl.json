@@ -1,4 +1,4 @@
-{
+﻿{
   "panels": {
     "liveNews": "Live nieuws",
     "markets": "Markten",
@@ -558,6 +558,7 @@
         "pipelines": "Pijpleidingen",
         "militaryActivity": "Militaire activiteit",
         "shipTraffic": "Scheepsverkeer",
+        "aviation": "Luchtvaart",
         "flightDelays": "Vluchtvertragingen",
         "protests": "Protesten",
         "ucdpEvents": "UCDP-evenementen",

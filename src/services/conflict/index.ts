@@ -438,7 +438,13 @@ export function getIranEventCssColor(ev: Pick<IranEvent, 'severity' | 'category'
   return IRAN_CSS[iranColorTier(ev)];
 }
 
-export function getIranEventHexColor(ev: Pick<IranEvent, 'severity'>): string {
+export function getIranEventHexColor(ev: Pick<IranEvent, 'severity' | 'category'>): string {
+  const type = ev.category.toLowerCase();
+  if (type.includes('missile') || type.includes('ballistic')) return '#ff3030';
+  if (type.includes('drone') || type.includes('uav')) return '#ff8800';
+  if (type.includes('cyber')) return '#44aaff';
+  if (type.includes('proxies') || type.includes('houthi') || type.includes('hezbollah')) return '#ffaa00';
+  
   if (ev.severity === 'high' || ev.severity === 'critical') return '#ff3030';
   if (ev.severity === 'elevated') return '#ff8800';
   return '#ffcc00';

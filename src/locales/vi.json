@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "Tình hình Toàn cầu với Phân tích AI"
@@ -1027,6 +1027,7 @@
         "pipelines": "Đường ống",
         "militaryActivity": "Hoạt động Quân sự",
         "shipTraffic": "Giao thông Hàng hải",
+        "aviation": "Hàng không",
         "flightDelays": "Chậm Chuyến bay",
         "protests": "Biểu tình",
         "ucdpEvents": "Sự kiện UCDP",

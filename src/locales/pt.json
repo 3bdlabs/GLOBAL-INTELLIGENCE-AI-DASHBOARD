@@ -1,4 +1,4 @@
-{
+﻿{
   "panels": {
     "liveNews": "Notícias ao vivo",
     "markets": "Mercados",
@@ -558,6 +558,7 @@
         "pipelines": "Gasodutos",
         "militaryActivity": "Atividade Militar",
         "shipTraffic": "Tráfego de navios",
+        "aviation": "Aviação",
         "flightDelays": "Atrasos em voos",
         "protests": "Protestos",
         "ucdpEvents": "Eventos UCDP",

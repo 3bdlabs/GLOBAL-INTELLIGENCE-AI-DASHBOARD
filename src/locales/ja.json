@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "AIインサイト付きグローバル情勢"
@@ -1027,6 +1027,7 @@
         "pipelines": "パイプライン",
         "militaryActivity": "軍事活動",
         "shipTraffic": "船舶交通",
+        "aviation": "航空",
         "flightDelays": "フライト遅延",
         "protests": "抗議活動",
         "ucdpEvents": "UCDPイベント",

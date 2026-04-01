@@ -24,3 +24,30 @@ export function yahooGate(): Promise<void> {
   });
   return yahooQueue;
 }
+
+// ========================================================================
+// Relay helpers
+// ========================================================================
+
+export function getRelayBaseUrl(): string | null {
+  const relayUrl = process.env.VITE_WS_RELAY_URL || process.env.WS_RELAY_URL;
+  if (!relayUrl) return null;
+  return relayUrl
+    .replace(/^ws(s?):\/\//, 'http$1://')
+    .replace(/\/$/, '');
+}
+
+export function getRelayHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'User-Agent': CHROME_UA,
+    'Accept': 'application/json'
+  };
+  const relaySecret = process.env.VITE_RELAY_SHARED_SECRET || process.env.RELAY_SHARED_SECRET;
+  if (relaySecret) {
+    const relayHeader = (process.env.VITE_RELAY_AUTH_HEADER || process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
+    headers[relayHeader] = relaySecret;
+    // Some legacy handlers use Authorization bearer
+    headers.Authorization = `Bearer ${relaySecret}`;
+  }
+  return headers;
+}

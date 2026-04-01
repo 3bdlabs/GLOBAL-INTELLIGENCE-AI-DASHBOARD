@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "Глобальная обстановка с ИИ-аналитикой"
@@ -1027,6 +1027,7 @@
         "pipelines": "Трубопроводы",
         "militaryActivity": "Военная активность",
         "shipTraffic": "Судоходство",
+        "aviation": "Авиация",
         "flightDelays": "Задержки рейсов",
         "protests": "Протесты",
         "ucdpEvents": "События UCDP",

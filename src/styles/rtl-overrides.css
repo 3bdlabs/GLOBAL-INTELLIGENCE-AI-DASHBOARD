@@ -1,4 +1,9 @@
 /* RTL overrides for Arabic (dir="rtl") — targeted fixes only */
+[dir="rtl"] {
+  font-family: 'Inter', 'Geeza Pro', 'SF Arabic', 'Tahoma', system-ui, sans-serif;
+  letter-spacing: 0 !important;
+  word-spacing: normal;
+}
 
 /* Language selector: flip arrow and margins */
 [dir="rtl"] .lang-select {

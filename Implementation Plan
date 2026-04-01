@@ -1,0 +1,42 @@
+# Strategic Analytics, Predictive, and Advisory Layer - Implementation Plan
+
+## Goal Description
+Implement a new Strategic Analytics, Predictive, and Advisory Layer for the Global Intelligence AI Dashboard. The layer will aggregate text summaries into a global context buffer, send them to a local Ollama instance (gpt-oss:20b) for trend correlation and predictive forecasting, and display the results in a new Intelligence Panel UI. The deployment will use a Docker-first approach to allow the containerized app to communicate with the host's Ollama instance.
+
+## Proposed Changes
+
+### 1. Docker & Network Config
+Since there is no existing `docker-compose.yml` or `Dockerfile` in the root workspace, we will create them to run the dashboard in a container.
+#### [NEW] `Dockerfile`
+A basic Node-based Dockerfile that installs dependencies and runs the Vite dev server (or a production build, but dev allows easy local testing).
+#### [NEW] `docker-compose.yml`
+Defines the `backend` service (which runs the whole app/dev server).
+Configures `extra_hosts: ["host.docker.internal:host-gateway"]` so the container can reach the host network.
+Sets environment variable `OLLAMA_BASE_URL=http://host.docker.internal:11434`.
+
+### 2. The Backend (The Aggregator) & AI Logic
+#### [NEW] `src/services/analyticsManager.ts`
+Implements the aggregator to collect text summaries from existing categories (or global buffer) and maintains a "Global Context Buffer."
+Includes the system prompt (acting as "Lead Intelligence Director") for Ollama and logic to call the Ollama API, requesting JSON output with `trend_correlation`, `seven_day_forecast`, and `advisor_strategy` (with `confidence_score`).
+#### [NEW] `api/v1/strategic-synthesis.ts`
+Because the app uses Vercel Edge functions, I will create a route at `api/v1/strategic-synthesis.ts` (or integrate it into the existing `api/` structure as a simple standalone edge function or Express-like handler depending on the existing setup). Note: the prompt specifically asks to add `/api/v1/strategic-synthesis` as an endpoint.
+
+### 3. The UI (Intelligence Panel)
+#### [NEW] `src/components/IntelligencePanel.tsx`
+A React/Preact component (Preact is used in this repo based on package.json).
+Will display:
+- Risk Meter (Gauge)
+- Forecast text area
+- Confidence progress bars
+Will fetch from `/api/v1/strategic-synthesis` and render the AI's Output.
+#### [MODIFY] Main dashboard grid (e.g., `index.html` or `src/app/panel-layout.ts`)
+Add the `IntelligencePanel` as a new independent tile in the dashboard grid.
+
+## Verification Plan
+### Automated Tests
+- Run `npm run typecheck` to ensure the new TypeScript code is correct.
+### Manual Verification
+1. Run `docker-compose up -d --build`
+2. Verify docker container spins up successfully.
+3. Call the `/api/v1/strategic-synthesis` route via `curl` inside the container or from the host via exposed port to verify it successfully hits Ollama.
+4. Open the UI to see the new **Intelligence Panel** tile rendering correctly.

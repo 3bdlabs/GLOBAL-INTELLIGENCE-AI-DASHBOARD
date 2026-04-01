@@ -8,30 +8,11 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/news/v1/service_server';
 import { cachedFetchJson, getCachedJsonBatch } from '../../../_shared/redis';
 import { sha256Hex } from '../../../_shared/hash';
-import { CHROME_UA } from '../../../_shared/constants';
+import { CHROME_UA, getRelayBaseUrl, getRelayHeaders } from '../../../_shared/constants';
 import { VARIANT_FEEDS, INTEL_SOURCES, type ServerFeed } from './_feeds';
 import { classifyByKeyword, type ThreatLevel } from './_classifier';
 
-function getRelayBaseUrl(): string | null {
-  const relayUrl = process.env.WS_RELAY_URL;
-  if (!relayUrl) return null;
-  return relayUrl
-    .replace(/^ws(s?):\/\//, 'http$1://')
-    .replace(/\/$/, '');
-}
-
-function getRelayHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'User-Agent': CHROME_UA,
-    Accept: 'application/rss+xml, application/xml, text/xml, */*',
-  };
-  const relaySecret = process.env.RELAY_SHARED_SECRET;
-  if (relaySecret) {
-    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
-    headers[relayHeader] = relaySecret;
-  }
-  return headers;
-}
+// Relay helpers removed - using centralized ones from ../../../_shared/constants
 
 const VALID_VARIANTS = new Set(['full', 'tech', 'finance', 'happy', 'commodity']);
 const fallbackDigestCache = new Map<string, { data: ListFeedDigestResponse; ts: number }>();

@@ -1,0 +1,47 @@
+# Globe.gl Integration Implementation Plan
+
+Replace the current "3D tilt" logic in `DeckGLMap.ts` with a dedicated `GlobeMap.ts` engine powered by `globe.gl`. This will allow for a true 3D globe view when "3D" mode is selected.
+
+## Proposed Changes
+
+### Core Engines
+
+#### [NEW] [GlobeMap.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/components/GlobeMap.ts)
+Implementation of the 3D globe using the `globe.gl` library.
+- Initializing the globe with topographic textures and starfield background.
+- Implementing semi-transparent atmosphere and custom polygons/markers.
+- Adding auto-rotation logic with idle resume (60s).
+
+#### [NEW] [globe-render-settings.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/services/globe-render-settings.ts)
+Configuration for globe textures, colors, and performance settings.
+
+### Components
+
+#### [MODIFY] [MapContainer.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/components/MapContainer.ts)
+Update the container to manage three engines: `DeckGLMap` (2D), `GlobeMap` (3D), and `MapComponent` (Mobile fallback).
+- Implement `switchToGlobe()` and `switchToFlat()` methods.
+- Add `rehydrateActiveMap()` to sync data across engines during a switch.
+- Update `toggle3DMode()` to trigger engine switching instead of camera tilt.
+
+### Layout & Logic
+
+#### [MODIFY] [panel-layout.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/app/panel-layout.ts)
+Ensure the `mapDimensionToggle` correctly calls the new `toggle3DMode` in `MapContainer`.
+
+### Assets
+
+#### [NEW] [earth-topo-bathy.jpg](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/public/textures/earth-topo-bathy.jpg)
+#### [NEW] [night-sky.png](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/public/textures/night-sky.png)
+#### [NEW] [earth-water.png](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/public/textures/earth-water.png)
+
+## Verification Plan
+
+### Automated Tests
+- `npm run build:full` to ensure TypeScript compliance and bundle success.
+
+### Manual Verification
+1. Open the dashboard.
+2. Click the "**3D**" button in the map header.
+3. Verify the Deck.gl map is replaced by a high-resolution 3D globe.
+4. Verify the globe rotates automatically when idle.
+5. Click "**2D**" and verify it switches back to the flat map without losing data markers.

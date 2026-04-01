@@ -13,6 +13,9 @@ export interface WeatherAlert {
   expires: Date;
   coordinates: [number, number][];
   centroid?: [number, number];
+  lat: number;
+  lon: number;
+  timestamp: Date;
 }
 
 interface BootstrapAlert {
@@ -42,6 +45,9 @@ function mapAlert(a: BootstrapAlert): WeatherAlert {
     expires: new Date(a.expires),
     coordinates: a.coordinates,
     centroid: a.centroid,
+    lat: a.centroid ? a.centroid[1] : (a.coordinates?.[0]?.[1] ?? 0),
+    lon: a.centroid ? a.centroid[0] : (a.coordinates?.[0]?.[0] ?? 0),
+    timestamp: new Date(a.onset),
   };
 }
 

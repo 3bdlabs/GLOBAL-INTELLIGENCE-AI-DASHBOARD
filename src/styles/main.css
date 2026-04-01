@@ -2514,7 +2514,7 @@ body.live-news-fullscreen-active .map-legend {
   display: none !important;
 }
 
-body.live-news-fullscreen-active .panels-grid > *:not(.live-news-fullscreen) {
+body.live-news-fullscreen-active .panels-grid>*:not(.live-news-fullscreen) {
   visibility: hidden !important;
 }
 
@@ -10719,8 +10719,38 @@ a.prediction-link:hover {
     background: var(--bg-tertiary, var(--border));
   }
 
+  .map-dimension-toggle {
+    display: flex;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .dim-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 6px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+  }
+
+  .dim-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .dim-btn.active {
+    background: var(--semantic-info);
+    color: #000;
+  }
+
   /* Hide pin button and resize handles on mobile */
   .map-pin-btn,
+  .map-dimension-toggle,
   .map-resize-handle,
   .panel-resize-handle {
     display: none !important;
@@ -10807,7 +10837,9 @@ a.prediction-link:hover {
   }
 
   /* Mobile: show "World Monitor" instead of "MONITOR" */
-  .logo {
+  .logo,
+  /* Show only X logo on mobile */
+  .credit-link .credit-text {
     display: none;
   }
 
@@ -15608,93 +15640,164 @@ body.has-breaking-alert .panels-grid {
 }
 
 .posture-theater {
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .posture-theater:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--shadow-color);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
+/* Normal compact glass */
 .posture-compact {
-  padding: 8px 12px;
-  background: var(--overlay-light);
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(30, 40, 60, 0.6), rgba(20, 30, 50, 0.4));
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
 }
 
+.posture-compact:hover {
+  background: linear-gradient(135deg, rgba(40, 55, 80, 0.7), rgba(30, 45, 70, 0.5));
+}
+
+/* Expanded tactical glass cards */
 .posture-expanded {
-  padding: 12px;
-  background: var(--overlay-medium);
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(30, 40, 60, 0.65), rgba(20, 30, 50, 0.45));
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .posture-expanded.critical {
-  border-left: 3px solid var(--semantic-critical);
-  background: rgba(255, 68, 68, 0.1);
+  border-left: 3px solid var(--semantic-critical, #ff4444);
+  background: linear-gradient(135deg, rgba(200, 30, 30, 0.14), rgba(100, 15, 15, 0.08));
+  box-shadow: inset 0 0 30px rgba(255, 68, 68, 0.06), 0 0 15px rgba(255, 68, 68, 0.08);
+  animation: crit-card-pulse 3s ease-in-out infinite;
 }
 
 .posture-expanded.elevated {
-  border-left: 3px solid var(--semantic-elevated);
-  background: rgba(255, 170, 0, 0.1);
+  border-left: 3px solid var(--semantic-elevated, #ffaa00);
+  background: linear-gradient(135deg, rgba(200, 140, 20, 0.12), rgba(100, 70, 10, 0.06));
+  box-shadow: inset 0 0 20px rgba(255, 170, 0, 0.04);
+}
+
+@keyframes crit-card-pulse {
+  0%, 100% { box-shadow: inset 0 0 30px rgba(255, 68, 68, 0.06), 0 0 15px rgba(255, 68, 68, 0.08); }
+  50% { box-shadow: inset 0 0 40px rgba(255, 68, 68, 0.1), 0 0 25px rgba(255, 68, 68, 0.12); }
+}
+
+/* Theater icon */
+.posture-theater-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.15));
 }
 
 .posture-theater-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.posture-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.posture-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .posture-name {
   font-weight: 600;
   font-size: 13px;
+  letter-spacing: 0.3px;
 }
 
+/* Posture badges — tactical pill style */
 .posture-badge {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  font-family: var(--font-mono, monospace);
 }
 
 .posture-critical {
-  background: rgba(var(--semantic-critical), 0.2);
-  color: var(--semantic-critical);
+  background: rgba(255, 50, 50, 0.25);
+  color: #ff5555;
+  border: 1px solid rgba(255, 50, 50, 0.4);
+  animation: crit-badge-glow 1.5s ease-in-out infinite;
+  text-shadow: 0 0 6px rgba(255, 50, 50, 0.5);
+}
+
+@keyframes crit-badge-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(255, 50, 50, 0.3); }
+  50% { box-shadow: 0 0 12px rgba(255, 50, 50, 0.6); }
 }
 
 .posture-elevated {
   background: rgba(255, 170, 0, 0.2);
-  color: var(--semantic-elevated);
+  color: var(--semantic-elevated, #ffaa00);
+  border: 1px solid rgba(255, 170, 0, 0.3);
 }
 
 .posture-normal {
-  background: rgba(68, 170, 68, 0.2);
-  color: var(--semantic-normal);
+  background: rgba(68, 170, 68, 0.15);
+  color: var(--semantic-normal, #44aa44);
+  border: 1px solid rgba(68, 170, 68, 0.2);
 }
 
-/* Compact chip layout for posture panel */
-.posture-compact {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--overlay-subtle);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s ease;
+/* Trend tags */
+.posture-trend-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  font-family: var(--font-mono, monospace);
 }
 
-.posture-compact:hover {
-  background: var(--overlay-light);
+.trend-tag-inc {
+  background: rgba(255, 80, 80, 0.15);
+  color: #ff6666;
+  border: 1px solid rgba(255, 80, 80, 0.25);
 }
 
+.trend-tag-dec {
+  background: rgba(80, 200, 120, 0.15);
+  color: #50c878;
+  border: 1px solid rgba(80, 200, 120, 0.25);
+}
+
+.trend-tag-stable {
+  background: rgba(120, 140, 180, 0.12);
+  color: rgba(160, 175, 210, 0.8);
+  border: 1px solid rgba(120, 140, 180, 0.2);
+}
+
+
+
+/* Compact chip layout for posture panel — glass style */
 .posture-compact .posture-name {
-  font-weight: 500;
+  font-weight: 600;
   font-size: 12px;
-  min-width: 60px;
+  min-width: 55px;
 }
+
 
 .posture-chips {
   display: flex;

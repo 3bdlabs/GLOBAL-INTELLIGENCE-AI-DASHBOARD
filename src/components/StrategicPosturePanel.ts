@@ -8,6 +8,18 @@ import { t } from '../services/i18n';
 import type { NewsItem, DeductContextDetail } from '@/types';
 import { buildNewsContext } from '@/utils/news-context';
 
+const THEATER_ICONS: Record<string, string> = {
+  'iran-theater': '🛢️',
+  'taiwan-theater': '🏝️',
+  'baltic-theater': '⚓',
+  'blacksea-theater': '🌊',
+  'korea-theater': '🎯',
+  'south-china-sea': '🏴',
+  'east-med-theater': '🌍',
+  'israel-gaza-theater': '🔥',
+  'yemen-redsea-theater': '🚢',
+};
+
 export class StrategicPosturePanel extends Panel {
   private postures: TheaterPostureSummary[] = [];
   private vesselTimeouts: ReturnType<typeof setTimeout>[] = [];
@@ -350,22 +362,22 @@ export class StrategicPosturePanel extends Panel {
   private getPostureBadge(level: string): string {
     switch (level) {
       case 'critical':
-        return `<span class="posture-badge posture-critical">${t('components.strategicPosture.badges.critical')}</span>`;
+        return `<span class="posture-badge posture-critical">CRIT</span>`;
       case 'elevated':
-        return `<span class="posture-badge posture-elevated">${t('components.strategicPosture.badges.elevated')}</span>`;
+        return `<span class="posture-badge posture-elevated">ELEV</span>`;
       default:
-        return `<span class="posture-badge posture-normal">${t('components.strategicPosture.badges.normal')}</span>`;
+        return `<span class="posture-badge posture-normal">NORM</span>`;
     }
   }
 
-  private getTrendIcon(trend: string, change: number): string {
+  private getTrendIcon(trend: string, _change: number): string {
     switch (trend) {
       case 'increasing':
-        return `<span class="posture-trend trend-up">↗ +${change}%</span>`;
+        return `<span class="posture-trend-tag trend-tag-inc">▲ INC</span>`;
       case 'decreasing':
-        return `<span class="posture-trend trend-down">↘ ${change}%</span>`;
+        return `<span class="posture-trend-tag trend-tag-dec">▼ DEC</span>`;
       default:
-        return `<span class="posture-trend trend-stable">→ ${t('components.strategicPosture.trendStable')}</span>`;
+        return `<span class="posture-trend-tag trend-tag-stable">● STABLE</span>`;
     }
   }
 
@@ -380,15 +392,17 @@ export class StrategicPosturePanel extends Panel {
     const displayName = this.theaterDisplayName(p);
 
     if (!isExpanded) {
-      // Compact single-line view for normal theaters
       const chips: string[] = [];
       if (p.totalAircraft > 0) chips.push(`<span class="posture-chip air">✈️ ${p.totalAircraft}</span>`);
       if (p.totalVessels > 0) chips.push(`<span class="posture-chip naval">⚓ ${p.totalVessels}</span>`);
+      const icon = THEATER_ICONS[p.theaterId] || '📍';
 
       return `
         <div class="posture-theater posture-compact" data-lat="${p.centerLat}" data-lon="${p.centerLon}" title="${t('components.strategicPosture.clickToView', { name: escapeHtml(displayName) })}">
+          <span class="posture-theater-icon">${icon}</span>
           <span class="posture-name">${escapeHtml(p.shortName)}</span>
           <div class="posture-chips">${chips.join('')}</div>
+          ${this.getTrendIcon(p.trend, p.changePercent)}
           ${this.getPostureBadge(p.postureLevel)}
         </div>
       `;
@@ -422,12 +436,19 @@ export class StrategicPosturePanel extends Panel {
 
     const hasAir = airChips.length > 0;
     const hasNaval = navalChips.length > 0;
+    const icon = THEATER_ICONS[p.theaterId] || '\ud83d\udccd';
 
     return `
       <div class="posture-theater posture-expanded ${p.postureLevel}" data-lat="${p.centerLat}" data-lon="${p.centerLon}" title="${t('components.strategicPosture.clickToViewMap')}">
         <div class="posture-theater-header">
-          <span class="posture-name">${escapeHtml(displayName)}</span>
-          ${this.getPostureBadge(p.postureLevel)}
+          <div class="posture-header-left">
+            <span class="posture-theater-icon">${icon}</span>
+            <span class="posture-name">${escapeHtml(displayName)}</span>
+          </div>
+          <div class="posture-header-right">
+            ${this.getTrendIcon(p.trend, p.changePercent)}
+            ${this.getPostureBadge(p.postureLevel)}
+          </div>
         </div>
 
         <div class="posture-forces">
@@ -437,9 +458,8 @@ export class StrategicPosturePanel extends Panel {
 
         <div class="posture-footer">
           ${p.strikeCapable ? `<span class="posture-strike">⚡ ${t('components.strategicPosture.strike')}</span>` : ''}
-          ${this.getTrendIcon(p.trend, p.changePercent)}
           ${p.targetNation ? `<span class="posture-focus">→ ${escapeHtml(p.targetNation)}</span>` : ''}
-          ${isDesktopRuntime() ? `<button class="posture-deduce-btn" title="Deduce Situation with AI" style="background: none; border: none; cursor: pointer; opacity: 0.7; font-size: 1.1em; transition: opacity 0.2s; margin-left: auto;" data-theater='${escapeHtml(JSON.stringify(p))}'>\u{1F9E0}</button>` : ''}
+          ${isDesktopRuntime() ? `<button class="posture-deduce-btn" title="Deduce Situation with AI" style="background: none; border: none; cursor: pointer; opacity: 0.7; font-size: 1.1em; transition: opacity 0.2s; margin-left: auto;" data-theater='${escapeHtml(JSON.stringify(p))}'>🧠</button>` : ''}
         </div>
       </div>
     `;

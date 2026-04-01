@@ -1,3 +1,4 @@
+import './polyfills';
 import './styles/base-layer.css';
 import './styles/happy-theme.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -14,7 +15,7 @@ Sentry.init({
   release: `worldmonitor@${__APP_VERSION__}`,
   environment: location.hostname === 'worldmonitor.app' ? 'production'
     : location.hostname.includes('vercel.app') ? 'preview'
-    : 'development',
+      : 'development',
   enabled: Boolean(sentryDsn) && !location.hostname.startsWith('localhost') && !('__TAURI_INTERNALS__' in window),
   sendDefaultPii: true,
   tracesSampleRate: 0.1,
@@ -313,7 +314,7 @@ initMetaTags();
 installRuntimeFetchPatch();
 // In web production, route RPC calls through api.worldmonitor.app (Cloudflare edge).
 installWebApiRedirect();
-loadDesktopSecrets().catch(() => {});
+loadDesktopSecrets().catch(() => { });
 
 // Apply stored theme preference before app initialization (safety net for inline script)
 applyStoredTheme();
@@ -359,6 +360,7 @@ if (urlParams.get('settings') === '1') {
 } else {
   installUtmInterceptor();
   const app = new App('app');
+  (window as any).app = app;
   app
     .init()
     .then(() => {
@@ -411,8 +413,9 @@ if (!('__TAURI_INTERNALS__' in window) && !('__TAURI__' in window) && 'serviceWo
       console.log('[PWA] Service worker registered');
       const swUpdateInterval = setInterval(async () => {
         if (!navigator.onLine) return;
-        try { await registration.update(); } catch {}
-      }, 5 * 60 * 1000);
+        try { await registration.update(); } catch { }
+      }, 60 * 60 * 1000);
+
       (window as unknown as Record<string, unknown>).__swUpdateInterval = swUpdateInterval;
     })
     .catch((err) => {

@@ -14,7 +14,7 @@ import {
   UPSTREAM_TIMEOUT_MS,
   type RawFlight,
 } from './_shared';
-import { CHROME_UA } from '../../../_shared/constants';
+import { CHROME_UA, getRelayBaseUrl, getRelayHeaders } from '../../../_shared/constants';
 
 const CACHE_KEY = 'theater-posture:sebuf:v1';
 const STALE_CACHE_KEY = 'theater-posture:sebuf:stale:v1';
@@ -32,19 +32,7 @@ const BACKUP_TTL = 604800;
 const WINGBITS_BACKOFF_MS = 5 * 60 * 1000; // 5 minutes
 let wingbitsBackoffUntil = 0;
 
-function getRelayRequestHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': CHROME_UA,
-  };
-  const relaySecret = process.env.RELAY_SHARED_SECRET;
-  if (relaySecret) {
-    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
-    headers[relayHeader] = relaySecret;
-    headers.Authorization = `Bearer ${relaySecret}`;
-  }
-  return headers;
-}
+// Relay helpers removed - using centralized ones from ../../../_shared/constants
 
 // Two bounding boxes covering all 9 POSTURE_THEATERS instead of fetching every
 // aircraft globally.  Returns ~hundreds of relevant states instead of ~10,000+.
@@ -81,17 +69,27 @@ async function fetchMilitaryFlightsFromOpenSky(): Promise<RawFlight[]> {
   const isSidecar = (process.env.LOCAL_API_MODE || '').includes('sidecar');
   const baseUrl = isSidecar
     ? 'https://opensky-network.org/api/states/all'
-    : process.env.WS_RELAY_URL ? process.env.WS_RELAY_URL + '/opensky' : null;
+    : getRelayBaseUrl() ? getRelayBaseUrl() + '/opensky' : null;
 
   if (!baseUrl) return [];
 
   const seenIds = new Set<string>();
   const allFlights: RawFlight[] = [];
 
+  const headers = getRelayHeaders();
+  if (isSidecar) {
+    const user = process.env.OPENSKY_USERNAME;
+    const pass = process.env.OPENSKY_PASSWORD;
+    if (user && pass) {
+      const auth = btoa(`${user}:${pass}`);
+      headers.Authorization = `Basic ${auth}`;
+    }
+  }
+
   for (const region of THEATER_QUERY_REGIONS) {
     const params = `lamin=${region.lamin}&lamax=${region.lamax}&lomin=${region.lomin}&lomax=${region.lomax}`;
     const resp = await fetch(`${baseUrl}?${params}`, {
-      headers: getRelayRequestHeaders(),
+      headers,
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
     if (!resp.ok) throw new Error(`OpenSky API error: ${resp.status} for ${region.name}`);

@@ -16,8 +16,11 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 1 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
   'strategic-posture': { name: 'AI Strategic Posture', enabled: true, priority: 1 },
+  'intelligence-panel': { name: 'Strategic Advisory', enabled: true, priority: 1 },
+  'master-analyst': { name: 'Master Analyst', enabled: true, priority: 1 },
   cii: { name: 'Country Instability', enabled: true, priority: 1, ...(_desktop && { premium: 'enhanced' as const }) },
   'strategic-risk': { name: 'Strategic Risk Overview', enabled: true, priority: 1, ...(_desktop && { premium: 'enhanced' as const }) },
+
   intel: { name: 'Intel Feed', enabled: true, priority: 1 },
   'gdelt-intel': { name: 'Live Intelligence', enabled: true, priority: 1, ...(_desktop && { premium: 'enhanced' as const }) },
   cascade: { name: 'Infrastructure Cascade', enabled: true, priority: 1 },
@@ -58,6 +61,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'oref-sirens': { name: 'Israel Sirens', enabled: true, priority: 2, ...(_desktop && { premium: 'locked' as const }) },
   'telegram-intel': { name: 'Telegram Intel', enabled: true, priority: 2, ...(_desktop && { premium: 'locked' as const }) },
   'airline-intel': { name: 'Airline Intelligence', enabled: true, priority: 2 },
+
   'tech-readiness': { name: 'Tech Readiness Index', enabled: true, priority: 2 },
   'world-clock': { name: 'World Clock', enabled: true, priority: 2 },
 };
@@ -867,7 +871,7 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   },
   dataTracking: {
     labelKey: 'header.panelCatDataTracking',
-    panelKeys: ['monitors', 'satellite-fires', 'ucdp-events', 'displacement', 'climate', 'population-exposure', 'security-advisories', 'oref-sirens', 'world-clock', 'tech-readiness'],
+    panelKeys: ['monitors', 'satellite-fires', 'ucdp-events', 'displacement', 'climate', 'population-exposure', 'security-advisories', 'oref-sirens', 'airline-intel', 'tech-readiness', 'world-clock'],
     variants: ['full'],
   },
 

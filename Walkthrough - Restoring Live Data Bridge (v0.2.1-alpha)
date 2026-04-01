@@ -1,0 +1,35 @@
+# Walkthrough - Restoring Live Data Bridge (v0.2.1-alpha)
+
+I have successfully restored the live data bridge and upgraded the application to version `0.2.1-alpha`. This update resolves significant architectural blockers related to API key synchronization, relay connectivity, and modular routing errors.
+
+## Key Accomplishments
+
+### 🟢 Live Data Restoration
+- **AISStream Integration**: Successfully updated the system with the provided API key. The relay container now shows a successful connection to `aisstream.io`, restoring live vessel tracking globally.
+- **Relay Security Sync**: Synchronized the `RELAY_SHARED_SECRET` and `RELAY_AUTH_HEADER` across the backend and the relay, resolving previous authentication failures.
+- **VITE_ Prefixes**: Implemented `VITE_` prefixed environment variables in `.env` to ensure the Vite development server can correctly access relay configuration.
+
+### 🛠️ Backend & Routing Fixes
+- **Modular API Proxy**: Corrected the `vite.config.ts` structural errors that were causing 404 responses for modular endpoints like `/api/supply-chain/v1`.
+- **Relay Helpers**: Refactored the server code to use centralized relay helpers, ensuring consistent communication between the backend services and the AIS/OpenSky relay.
+- **Service Re-deployment**: Executed `docker-compose up -d --build` to ensure all services are running the new architecture and versioning.
+
+### 🏷️ Versioning Update
+- The project has been officially moved from `v0.2.0` to `v0.2.1-alpha` across `package.json`, `VERSION`, and UI components.
+
+## Verification Results
+
+### Relay Logs (AIS Connection)
+```text
+relay-1  | [Relay] WebSocket relay on port 3004
+relay-1  | [Relay] Connecting to aisstream.io...
+relay-1  | [Relay] Connected to aisstream.io
+```
+
+### Dashboard Access
+- The dashboard is active and accessible on **port 3000**.
+- The **AI Strategic Posture** panel and **Maritime** layers are now receiving real-time updates from the live bridge.
+
+## Next Steps
+- **Monitor Global Rate Limits**: Some external sources (like Yahoo Finance) are currently showing `429 Too Many Requests`. The system remains functional, but these specific feeds may experience intermittent outages during high-load periods.
+- **UI Customization**: Now that the live bridge is functional, you can begin customizing the panel layouts and persistence settings for your specific operational needs.

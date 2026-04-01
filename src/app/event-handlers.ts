@@ -533,7 +533,7 @@ export class EventHandlerManager implements AppModule {
   setupUrlStateSync(): void {
     if (!this.ctx.map) return;
 
-    this.ctx.map.onStateChanged(() => {
+    const sync = () => {
       this.debouncedUrlSync();
       const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
       if (regionSelect && this.ctx.map) {
@@ -542,7 +542,13 @@ export class EventHandlerManager implements AppModule {
           regionSelect.value = state.view;
         }
       }
-    });
+    };
+
+    if (typeof (this.ctx.map as any).onStateChanged === 'function') {
+      this.ctx.map.onStateChanged(sync);
+    } else if (typeof this.ctx.map.setOnStateChange === 'function') {
+      this.ctx.map.setOnStateChange(sync);
+    }
     this.debouncedUrlSync();
   }
 

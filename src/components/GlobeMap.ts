@@ -1,7 +1,8 @@
 /**
  * GlobeMap - 3D interactive globe using globe.gl
  *
- * Matches World Monitor's MapContainer API so it can be used as a drop-in
+ * Matches WorldMonitor's MapContainer API so it can be used as a drop-in
+
  * replacement within MapContainer when the user enables globe mode.
  *
  * Architecture mirrors Sentinel (sentinel.axonia.us):
@@ -23,6 +24,7 @@ import { t } from '@/services/i18n';
 import { SITE_VARIANT } from '@/config/variant';
 import { getGlobeRenderScale, resolveGlobePixelRatio, resolvePerformanceProfile, subscribeGlobeRenderScaleChange, getGlobeTexture, GLOBE_TEXTURE_URLS, subscribeGlobeTextureChange, getGlobeVisualPreset, subscribeGlobeVisualPresetChange, type GlobeRenderScale, type GlobePerformanceProfile, type GlobeVisualPreset } from '@/services/globe-render-settings';
 import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVariant } from '@/config/map-layer-definitions';
+
 import { getSecretState } from '@/services/runtime-config';
 import { resolveTradeRouteSegments, type TradeRouteSegment } from '@/config/trade-routes';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
@@ -31,9 +33,36 @@ import { getCountryBbox, getCountriesGeoJson, getCountryAtCoordinates, getCountr
 import { escapeHtml } from '@/utils/sanitize';
 import { showLayerWarning } from '@/utils/layer-warning';
 import type { FeatureCollection, Geometry } from 'geojson';
-import type { MapLayers, Hotspot, MilitaryFlight, MilitaryVessel, NaturalEvent, InternetOutage, CyberThreat, SocialUnrestEvent, UcdpGeoEvent, MilitaryBase, GammaIrradiator, Spaceport, EconomicCenter, StrategicWaterway, CriticalMineralProject, AIDataCenter, UnderseaCable, Pipeline, CableAdvisory, RepairShip, AisDisruptionEvent, AisDensityZone, AisDisruptionType } from '@/types';
+import type {
+  MapLayers,
+  Hotspot,
+  MilitaryFlight,
+  MilitaryVessel,
+  NaturalEvent,
+  InternetOutage,
+  CyberThreat,
+  SocialUnrestEvent,
+  UcdpGeoEvent,
+  MilitaryBase,
+  GammaIrradiator,
+  Spaceport,
+  EconomicCenter,
+  StrategicWaterway,
+  CriticalMineralProject,
+  AIDataCenter,
+  UnderseaCable,
+  Pipeline,
+  CableAdvisory,
+  RepairShip,
+  AisDisruptionEvent,
+  AisDensityZone,
+  AisDisruptionType,
+  MilitaryFlightCluster,
+  MilitaryVesselCluster,
+} from '@/types';
+
 import type { Earthquake } from '@/services/earthquakes';
-import type { AirportDelayAlert } from '@/services/aviation';
+import type { AirportDelayAlert, PositionSample } from '@/services/aviation';
 import type { MapContainerState, MapView, TimeRange } from './MapContainer';
 import type { CountryClickPayload } from './DeckGLMap';
 import type { WeatherAlert } from '@/services/weather';
@@ -43,19 +72,24 @@ import type { ClimateAnomaly } from '@/services/climate';
 import type { GpsJamHex } from '@/services/gps-interference';
 import type { SatellitePosition } from '@/services/satellites';
 import type { ImageryScene } from '@/generated/server/worldmonitor/imagery/v1/service_server';
-import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
+import { isAllowedPreviewUrl } from '@/utils/imagery-preview'; // @ts-ignore
+// import type { HappinessData } from '@/services/happiness-data';
+import type { SpeciesRecovery } from '@/services/conservation-data';
 
 const SAT_COUNTRY_COLORS: Record<string, string> = { CN: '#ff2020', RU: '#ff8800', US: '#4488ff', EU: '#44cc44', KR: '#aa66ff', IN: '#ff66aa', TR: '#ff4466', OTHER: '#ccccff' };
 const SAT_TYPE_EMOJI: Record<string, string> = { sar: '\u{1F4E1}', optical: '\u{1F4F7}', military: '\u{1F396}', sigint: '\u{1F4FB}' };
 const SAT_TYPE_LABEL: Record<string, string> = { sar: 'SAR Imaging', optical: 'Optical Imaging', military: 'Military', sigint: 'SIGINT' };
 const SAT_OPERATOR_NAME: Record<string, string> = { CN: 'China', RU: 'Russia', US: 'United States', EU: 'ESA / EU', KR: 'South Korea', IN: 'India', TR: 'Turkey', OTHER: 'Other' };
 
+
 // ─── Marker discriminated union ─────────────────────────────────────────────
 interface BaseMarker {
   _kind: string;
   _lat: number;
   _lng: number;
+  _time?: number; // Added for time range filtering
 }
+
 interface ConflictMarker extends BaseMarker {
   _kind: 'conflict';
   id: string;
@@ -157,7 +191,9 @@ interface GpsJamMarker extends BaseMarker {
   id: string;
   level: string;
   npAvg: number;
+  pct?: number;
 }
+
 interface TechMarker extends BaseMarker {
   _kind: 'tech';
   id: string;
@@ -254,6 +290,7 @@ interface NotamRingMarker extends BaseMarker {
   name: string;
   reason: string;
 }
+
 interface NewsLocationMarker extends BaseMarker {
   _kind: 'newsLocation';
   id: string;
@@ -325,6 +362,7 @@ interface GlobePolygon {
   coords: number[][][];
   name: string;
   _kind: 'cii' | 'conflict' | 'imageryFootprint' | 'forecastCone';
+  countryCode?: string;
   level?: string;
   score?: number;
 
@@ -395,6 +433,7 @@ export class GlobeMap {
   // Current data
   private hotspots: HotspotMarker[] = [];
   private flights: FlightMarker[] = [];
+  private aircraftMarkers: FlightMarker[] = [];
   private vessels: VesselMarker[] = [];
   private weatherMarkers: WeatherMarker[] = [];
   private naturalMarkers: NaturalMarker[] = [];
@@ -451,18 +490,21 @@ export class GlobeMap {
 
   // Click callbacks
   private onHotspotClickCb: ((h: Hotspot) => void) | null = null;
+  private onStateChange: ((state: MapContainerState) => void) | null = null;
+  private onCountryClick: ((c: CountryClickPayload) => void) | null = null;
+  private onLayerChangeCb: ((layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void) | null = null;
+  private onTimeRangeChange: ((range: TimeRange) => void) | null = null;
+  private layerTogglesEl: HTMLElement | null = null;
 
   // Auto-rotate timer (like Sentinel: resume after 60 s idle)
   private autoRotateTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Overlay UI elements
-  private layerTogglesEl: HTMLElement | null = null;
   private tooltipEl: HTMLElement | null = null;
   private tooltipHideTimer: ReturnType<typeof setTimeout> | null = null;
   private satHoverStyle: HTMLStyleElement | null = null;
 
   // Callbacks
-  private onLayerChangeCb: ((layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void) | null = null;
   private onMapContextMenuCb?: (payload: { lat: number; lon: number; screenX: number; screenY: number }) => void;
   private readonly handleContextMenu = (e: MouseEvent): void => {
     e.preventDefault();
@@ -558,7 +600,6 @@ export class GlobeMap {
       this.imageryFetchTimer = setTimeout(() => this.fetchImageryForViewport(), 800);
     };
     controls.addEventListener('end', this.controlsEndHandler);
-
     // Force the canvas to visually fill the container so it expands with CSS transitions.
     // globe.gl sets explicit width/height attributes; we override the CSS so the canvas
     // always covers the full container even before the next renderer resize fires.
@@ -634,7 +675,6 @@ export class GlobeMap {
     }
 
     this.container.addEventListener('contextmenu', this.handleContextMenu);
-
     // Wire HTML marker layer
     globe
       .htmlElementsData([])
@@ -789,6 +829,20 @@ export class GlobeMap {
           return label;
         }
         return escapeHtml(d.name);
+      })
+      .onPolygonClick((d: object, event: MouseEvent) => {
+        const poly = d as GlobePolygon;
+        if ((poly._kind === 'cii' || poly._kind === 'conflict') && poly.countryCode) {
+          if (this.onCountryClick) {
+            this.onCountryClick({
+              countryCode: poly.countryCode,
+              countryName: poly.name,
+              lat: 0, // centroid not easily available here
+              lon: 0,
+              originalEvent: event
+            } as any);
+          }
+        }
       });
 
     this.globe = globe;
@@ -822,7 +876,6 @@ export class GlobeMap {
     if (this.layers.satellites) {
       this.fetchImageryForViewport();
     }
-
     // Idle rendering: pause animation when nothing is happening
     this.setupVisibilityHandler();
     this.scheduleIdlePause();
@@ -847,7 +900,6 @@ export class GlobeMap {
   private static wrapHit(inner: string): string {
     return `<div style="width:20px;height:20px;display:flex;align-items:center;justify-content:center">${inner}</div>`;
   }
-
   private buildMarkerElement(d: GlobeMarker): HTMLElement {
     const el = document.createElement('div');
     el.style.cssText = 'pointer-events:auto;cursor:pointer;user-select:none;';
@@ -1008,6 +1060,7 @@ export class GlobeMap {
     } else if (d._kind === 'spaceport') {
       el.innerHTML = GlobeMap.wrapHit(`<div style="font-size:11px;color:#88ddff;text-shadow:0 0 4px #88ddff88;">🚀</div>`);
       el.title = `${d.name} (${d.operator})`;
+      el.title = `${d.name} (${d.operator})`;
     } else if (d._kind === 'earthquake') {
       const mc = d.magnitude >= 6 ? '#ff2020' : d.magnitude >= 4 ? '#ff8800' : '#ffcc00';
       const sz = Math.max(8, Math.min(18, Math.round(d.magnitude * 2.5)));
@@ -1030,9 +1083,6 @@ export class GlobeMap {
       const sc = d.severity === 'severe' ? '#ff2020' : d.severity === 'major' ? '#ff6600' : d.severity === 'moderate' ? '#ffaa00' : '#ffee44';
       el.innerHTML = GlobeMap.wrapHit(`<div style="font-size:11px;color:${sc};text-shadow:0 0 4px ${sc}88;">✈</div>`);
       el.title = `${d.iata} — ${d.severity}`;
-    } else if (d._kind === 'notamRing') {
-      el.innerHTML = `<div style="position:relative;width:20px;height:20px;display:flex;align-items:center;justify-content:center;"><div style="position:absolute;inset:-3px;border-radius:50%;border:2px solid #ff282888;${this.pulseStyle('2s')}"></div><div style="font-size:12px;color:#ff2828;text-shadow:0 0 6px #ff282888;">⚠</div></div>`;
-      el.title = `NOTAM: ${d.name}`;
     } else if (d._kind === 'cableAdvisory') {
       const sc = d.severity === 'fault' ? '#ff2020' : '#ff8800';
       el.innerHTML = GlobeMap.wrapHit(`<div style="font-size:11px;color:${sc};text-shadow:0 0 4px ${sc}88;">🔌</div>`);
@@ -1056,18 +1106,6 @@ export class GlobeMap {
       const sc = d.severity === 'high' ? '#ff2020' : d.severity === 'elevated' ? '#ff8800' : '#44aaff';
       el.innerHTML = GlobeMap.wrapHit(`<div style="font-size:11px;color:${sc};text-shadow:0 0 4px ${sc}88;">⛴</div>`);
       el.title = d.name;
-    } else if (d._kind === 'satellite') {
-      const c = SAT_COUNTRY_COLORS[(d as SatelliteMarker).country] || '#ccccff';
-      el.innerHTML = `<div class="sat-hit" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;margin:-8px 0 0 -8px;color:${c}"><div class="sat-dot" style="width:5px;height:5px;border-radius:50%;background:${c};box-shadow:0 0 6px 2px ${c}88;transition:transform .15s,box-shadow .15s;"></div></div>`;
-      el.title = `${(d as SatelliteMarker).name}`;
-    } else if (d._kind === 'satFootprint') {
-      const colors: Record<string, string> = { CN: '#ff2020', RU: '#ff8800', US: '#4488ff', EU: '#44cc44' };
-      const c = colors[(d as SatFootprintMarker).country] || '#ccccff';
-      el.innerHTML = `<div style="width:12px;height:12px;border-radius:50%;border:1px solid ${c}66;background:${c}15;margin:-6px 0 0 -6px"></div>`;
-      el.style.pointerEvents = 'none';
-    } else if (d._kind === 'imageryScene') {
-      el.innerHTML = GlobeMap.wrapHit(`<div style="font-size:11px;color:#00b4ff;text-shadow:0 0 4px #00b4ff88;">&#128752;</div>`);
-      el.title = `${d.satellite} ${d.datetime}`;
     } else if (d._kind === 'flash') {
       el.style.pointerEvents = 'none';
       el.innerHTML = `
@@ -1089,14 +1127,7 @@ export class GlobeMap {
 
   private handleMarkerClick(d: GlobeMarker, anchor: HTMLElement): void {
     if (d._kind === 'hotspot' && this.onHotspotClickCb) {
-      this.onHotspotClickCb({
-        id: d.id,
-        name: d.name,
-        lat: d._lat,
-        lon: d._lng,
-        keywords: [],
-        escalationScore: d.escalationScore as Hotspot['escalationScore'],
-      });
+      this.onHotspotClickCb(d as any);
     }
     this.showMarkerTooltip(d, anchor);
   }
@@ -1120,7 +1151,6 @@ export class GlobeMap {
     ].join(';');
 
     const closeBtn = `<button style="position:absolute;top:4px;right:4px;background:none;border:none;color:#888;cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;" aria-label="Close">\u00D7</button>`;
-
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     let html = '';
@@ -1183,7 +1213,7 @@ export class GlobeMap {
       const gc = d.level === 'high' ? '#ff2020' : '#ff8800';
       html = `<span style="color:${gc};font-weight:bold;">📡 GPS Jamming</span>` +
              `<br><span style="opacity:.7;">Level: ${esc(d.level)}</span>` +
-             `<br><span style="opacity:.5;">NP avg: ${d.npAvg.toFixed(2)}</span>`;
+             `<br><span style="opacity:.5;">NP avg: ${d.npAvg.toFixed(2)}${d.pct ? ` · ${d.pct.toFixed(0)}% affected` : ''}</span>`;
     } else if (d._kind === 'tech') {
       html = `<span style="color:#44aaff;font-weight:bold;">💻 ${esc(d.title.slice(0, 50))}</span>` +
              `<br><span style="opacity:.7;">${esc(d.country)}</span>` +
@@ -1291,6 +1321,7 @@ export class GlobeMap {
         html += `<br><img src="${safeHref}" referrerpolicy="no-referrer" style="max-width:180px;max-height:120px;margin-top:4px;border-radius:4px;" class="imagery-preview">`;
       }
     }
+
     el.innerHTML = `<div style="padding-right:16px;position:relative;">${closeBtn}${html}</div>`;
     if (d._kind === 'satellite') el.style.maxWidth = '300px';
     el.querySelector('button')?.addEventListener('click', () => this.hideTooltip());
@@ -1324,7 +1355,10 @@ export class GlobeMap {
   }
 
   private hideTooltip(): void {
-    if (this.tooltipHideTimer) { clearTimeout(this.tooltipHideTimer); this.tooltipHideTimer = null; }
+    if (this.tooltipHideTimer) {
+      clearTimeout(this.tooltipHideTimer);
+      this.tooltipHideTimer = null;
+    }
     this.tooltipEl?.remove();
     this.tooltipEl = null;
   }
@@ -1344,8 +1378,8 @@ export class GlobeMap {
     this.container.appendChild(el);
     el.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
-      if      (target.classList.contains('zoom-in'))    this.zoomInGlobe();
-      else if (target.classList.contains('zoom-out'))   this.zoomOutGlobe();
+      if (target.classList.contains('zoom-in')) this.zoomInGlobe();
+      else if (target.classList.contains('zoom-out')) this.zoomOutGlobe();
       else if (target.classList.contains('zoom-reset')) this.setView(this.currentView);
     });
   }
@@ -1398,10 +1432,7 @@ export class GlobeMap {
           </label>`;
         }).join('')}
       </div>`;
-    const authorBadge = document.createElement('div');
-    authorBadge.className = 'map-author-badge';
-    authorBadge.textContent = '© Elie Habib · Someone™';
-    el.appendChild(authorBadge);
+
     this.container.appendChild(el);
 
     el.querySelectorAll('.layer-toggle input').forEach(input => {
@@ -1441,23 +1472,53 @@ export class GlobeMap {
     this.layerTogglesEl = el;
   }
 
-  // ─── Flush all current data to globe ──────────────────────────────────────
+  // ─── Idle rendering Control ─────────────────────────────────────────────
 
-  private flushMarkers(): void {
-    if (!this.globe || !this.initialized || this.destroyed || this.webglLost) return;
-    if (this.renderPaused) { this.pendingFlushWhilePaused = true; return; }
-
-    if (!this.flushMaxTimer) {
-      this.flushMaxTimer = setTimeout(() => {
-        this.flushMaxTimer = null;
-        if (this.flushTimer) { clearTimeout(this.flushTimer); this.flushTimer = null; }
-        this.flushMarkersImmediate();
-      }, 300);
+  private wakeGlobe(): void {
+    if (this.destroyed || !this.globe) return;
+    if (!this.isGlobeAnimating) {
+      this.isGlobeAnimating = true;
+      try { (this.globe as any).resumeAnimation?.(); } catch { /* best-effort */ }
     }
-    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.scheduleIdlePause();
+  }
+
+  private scheduleIdlePause(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    // After 3 seconds of no interaction/data change, pause rendering
+    this.idleTimer = setTimeout(() => {
+      if (this.destroyed || !this.globe || this.renderPaused) return;
+      // Don't pause if auto-rotate is active (user expects continuous spin)
+      if (this.controls?.autoRotate) return;
+      this.isGlobeAnimating = false;
+      try { (this.globe as any).pauseAnimation?.(); } catch { /* best-effort */ }
+    }, 3000);
+  }
+
+  private setupVisibilityHandler(): void {
+    this.visibilityHandler = () => {
+      if (document.hidden) {
+        if (this.isGlobeAnimating && this.globe) {
+          this.isGlobeAnimating = false;
+          try { (this.globe as any).pauseAnimation?.(); } catch { /* ignore */ }
+        }
+        if (this.extrasAnimFrameId != null) {
+          cancelAnimationFrame(this.extrasAnimFrameId);
+          this.extrasAnimFrameId = null;
+        }
+      } else {
+        this.wakeGlobe();
+        if (this.outerGlow && this.extrasAnimFrameId == null) {
+          this.startExtrasLoop();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+  private flushMarkers(): void {
+    if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
-      if (this.flushMaxTimer) { clearTimeout(this.flushMaxTimer); this.flushMaxTimer = null; }
       this.flushMarkersImmediate();
     }, 100);
   }
@@ -1465,57 +1526,75 @@ export class GlobeMap {
   private flushMarkersImmediate(): void {
     if (!this.globe || !this.initialized || this.destroyed || this.webglLost) return;
     this.wakeGlobe();
+    if (this.renderPaused) {
+      this.pendingFlushWhilePaused = true;
+      return;
+    }
 
-    const markers: GlobeMarker[] = [];
-    if (this.layers.hotspots) markers.push(...this.hotspots);
-    if (this.layers.conflicts) markers.push(...this.conflictZoneMarkers);
-    if (this.layers.bases) markers.push(...this.milBaseMarkers);
-    if (this.layers.nuclear) markers.push(...this.nuclearSiteMarkers);
-    if (this.layers.irradiators) markers.push(...this.irradiatorSiteMarkers);
-    if (this.layers.spaceports) markers.push(...this.spaceportSiteMarkers);
-    if (this.layers.military) {
-      markers.push(...this.flights);
-      markers.push(...this.vessels);
-    }
-    if (this.layers.weather) markers.push(...this.weatherMarkers);
-    if (this.layers.natural) {
-      markers.push(...this.naturalMarkers);
-      markers.push(...this.earthquakeMarkers);
-    }
-    if (this.layers.economic) markers.push(...this.economicMarkers);
-    if (this.layers.datacenters) markers.push(...this.datacenterMarkers);
-    if (this.layers.waterways) markers.push(...this.waterwayMarkers);
-    if (this.layers.minerals) markers.push(...this.mineralMarkers);
-    if (this.layers.flights) {
-      markers.push(...this.flightDelayMarkers);
-      markers.push(...this.notamRingMarkers);
-    }
-    if (this.layers.ais) markers.push(...this.aisMarkers);
-    if (this.layers.iranAttacks) markers.push(...this.iranMarkers);
-    if (this.layers.outages) markers.push(...this.outageMarkers);
-    if (this.layers.cyberThreats) markers.push(...this.cyberMarkers);
-    if (this.layers.fires) markers.push(...this.fireMarkers);
-    if (this.layers.protests) markers.push(...this.protestMarkers);
-    if (this.layers.ucdpEvents) markers.push(...this.ucdpMarkers);
-    if (this.layers.displacement) markers.push(...this.displacementMarkers);
-    if (this.layers.climate) markers.push(...this.climateMarkers);
-    if (this.layers.gpsJamming) markers.push(...this.gpsJamMarkers);
+    const markers: GlobeMarker[] = [
+      ...this.filterByTime(this.hotspots),
+      ...this.filterByTime(this.flights),
+      ...this.filterByTime(this.aircraftMarkers),
+      ...this.filterByTime(this.vessels),
+      ...this.filterByTime(this.weatherMarkers),
+      ...this.filterByTime(this.naturalMarkers),
+      ...this.filterByTime(this.iranMarkers),
+      ...this.filterByTime(this.outageMarkers),
+      ...this.filterByTime(this.cyberMarkers),
+      ...this.filterByTime(this.fireMarkers),
+      ...this.filterByTime(this.protestMarkers),
+      ...this.filterByTime(this.ucdpMarkers),
+      ...this.filterByTime(this.displacementMarkers),
+      ...this.filterByTime(this.climateMarkers),
+      ...this.filterByTime(this.gpsJamMarkers),
+      ...this.filterByTime(this.techMarkers),
+      ...this.filterByTime(this.conflictZoneMarkers),
+      ...this.filterByTime(this.milBaseMarkers),
+      ...this.filterByTime(this.nuclearSiteMarkers),
+      ...this.filterByTime(this.irradiatorSiteMarkers),
+      ...this.filterByTime(this.spaceportSiteMarkers),
+      ...this.filterByTime(this.earthquakeMarkers),
+      ...this.filterByTime(this.economicMarkers),
+      ...this.filterByTime(this.datacenterMarkers),
+      ...this.filterByTime(this.waterwayMarkers),
+      ...this.filterByTime(this.mineralMarkers),
+      ...this.filterByTime(this.flightDelayMarkers),
+      ...this.filterByTime(this.notamRingMarkers),
+      ...this.filterByTime(this.newsLocationMarkers),
+      ...this.filterByTime(this.flashMarkers),
+      ...this.filterByTime(this.cableAdvisoryMarkers),
+      ...this.filterByTime(this.repairShipMarkers),
+      ...this.filterByTime(this.aisMarkers),
+    ].filter(m => {
+      const channel = (this.constructor as any).LAYER_CHANNELS.get(m._kind);
+      if (channel && channel.markers === false) return false;
+      return (this.layers as any)[m._kind] !== false;
+    }) as any[];
+
     if (this.layers.satellites) {
       markers.push(...this.satelliteMarkers);
       markers.push(...this.satelliteFootprintMarkers);
       markers.push(...this.imagerySceneMarkers);
     }
-    if (this.layers.techEvents) markers.push(...this.techMarkers);
-    if (this.layers.cables) {
-      markers.push(...this.cableAdvisoryMarkers);
-      markers.push(...this.repairShipMarkers);
-    }
-    markers.push(...this.newsLocationMarkers);
-    markers.push(...this.flashMarkers);
 
     try {
       this.globe.htmlElementsData(markers);
+      this.pendingFlushWhilePaused = false;
     } catch (err) { if (import.meta.env.DEV) console.warn('[GlobeMap] flush error', err); }
+  }
+
+  private filterByTime<T extends BaseMarker>(data: T[]): T[] {
+    if (this.timeRange === 'all') return data;
+    const now = Date.now();
+    let cutoff = 0;
+    switch (this.timeRange) {
+      case '1h': cutoff = now - 3600_000; break;
+      case '6h': cutoff = now - 21600_000; break;
+      case '24h': cutoff = now - 86400_000; break;
+      case '48h': cutoff = now - 172800_000; break;
+      case '7d': cutoff = now - 604800_000; break;
+    }
+    return data.filter(d => !d._time || d._time >= cutoff);
   }
 
   private flushArcs(): void {
@@ -1583,6 +1662,7 @@ export class GlobeMap {
                 coords: this.getReversedRing(z.id, code, ri, rings[ri] as number[][][]),
                 name: z.name,
                 _kind: 'conflict',
+                countryCode: code,
                 intensity: z.intensity ?? 'low',
                 parties: z.parties,
                 casualties: z.casualties,
@@ -1603,7 +1683,7 @@ export class GlobeMap {
         const rings = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
         const name = (feat.properties?.name as string) ?? code;
         for (const ring of rings) {
-          polys.push({ coords: ring, name, _kind: 'cii', level: entry.level, score: entry.score });
+          polys.push({ coords: ring, name, _kind: 'cii', countryCode: code, level: entry.level, score: entry.score });
         }
       }
     }
@@ -1611,7 +1691,6 @@ export class GlobeMap {
     if (this.layers.satellites) {
       polys.push(...this.imageryFootprintPolygons);
     }
-
     if (this.layers.natural) {
       polys.push(...this.stormConePolygons);
     }
@@ -1754,42 +1833,49 @@ export class GlobeMap {
     ];
   }
 
-  public setMilitaryFlights(flights: MilitaryFlight[]): void {
+  public setMilitaryFlights(flights: MilitaryFlight[], _clusters: MilitaryFlightCluster[] = []): void {
     this.flights = flights.map(f => ({
       _kind: 'flight' as const,
       _lat: f.lat,
       _lng: f.lon,
+      _time: f.lastSeen?.getTime(),
       id: f.id,
       callsign: f.callsign ?? '',
-      type: (f as any).aircraftType ?? (f as any).type ?? 'fighter',
-      heading: (f as any).heading ?? 0,
+      type: f.aircraftType || (f as any).type || 'fighter',
+      heading: f.heading ?? 0,
     }));
     this.flushMarkers();
   }
 
-  public setMilitaryVessels(vessels: MilitaryVessel[]): void {
+  public setMilitaryVessels(vessels: MilitaryVessel[], _clusters: MilitaryVesselCluster[] = []): void {
     this.vessels = vessels.map(v => ({
       _kind: 'vessel' as const,
       _lat: v.lat,
       _lng: v.lon,
+      _time: v.lastAisUpdate?.getTime(),
       id: v.id,
-      name: (v as any).name ?? 'vessel',
-      type: (v as any).vesselType ?? 'destroyer',
+      name: v.name || (v as any).vesselName || 'vessel',
+      type: v.vesselType || 'destroyer',
     }));
     this.flushMarkers();
   }
 
   public setWeatherAlerts(alerts: WeatherAlert[]): void {
     this.weatherMarkers = (alerts ?? [])
-      .filter(a => a.centroid != null)
-      .map(a => ({
-        _kind: 'weather' as const,
-        _lat: a.centroid![1],   // centroid is [lon, lat]
-        _lng: a.centroid![0],
-        id: a.id,
-        severity: a.severity ?? 'Minor',
-        headline: a.headline ?? a.event ?? '',
-      }));
+      .map(a => {
+        const lat = a.lat ?? (a.centroid ? a.centroid[1] : 0);
+        const lon = a.lon ?? (a.centroid ? a.centroid[0] : 0);
+        return {
+          _kind: 'weather' as const,
+          _lat: lat,
+          _lng: lon,
+          _time: a.timestamp?.getTime(),
+          id: a.id,
+          severity: a.severity ?? 'Minor',
+          headline: a.headline ?? a.event ?? '',
+        };
+      })
+      .filter(m => m._lat !== 0 || m._lng !== 0);
     this.flushMarkers();
   }
 
@@ -1860,9 +1946,8 @@ export class GlobeMap {
     ['pipelines',     { markers: false, arcs: false, paths: true,  polygons: false }],
     ['conflicts',     { markers: true,  arcs: false, paths: false, polygons: true }],
     ['cables',        { markers: true,  arcs: false, paths: true,  polygons: false }],
-    ['satellites',        { markers: true,  arcs: false, paths: true,  polygons: true }],
-
-    ['natural',           { markers: true,  arcs: false, paths: true,  polygons: true }],
+    ['satellites',    { markers: true,  arcs: false, paths: true,  polygons: true }],
+    ['natural',       { markers: true,  arcs: false, paths: true,  polygons: true }],
   ]);
 
   private flushLayerChannels(layer: keyof MapLayers): void {
@@ -1917,8 +2002,8 @@ export class GlobeMap {
     this.enforceLayerLimit();
   }
 
-  private layerWarningShown = false;
   private lastActiveLayerCount = 0;
+  private layerWarningShown = false;
 
   private enforceLayerLimit(): void {
     if (!this.layerTogglesEl) return;
@@ -1950,6 +2035,13 @@ export class GlobeMap {
 
   public setView(view: MapView): void {
     this.currentView = view;
+    if (this.onStateChange) {
+      this.onStateChange({
+        filters: { timeRange: this.timeRange },
+        layers: this.layers,
+        view: { type: this.currentView }
+      } as any);
+    }
     if (!this.globe) return;
     this.wakeGlobe();
     const pov = GlobeMap.VIEW_POVS[view] ?? GlobeMap.VIEW_POVS.global;
@@ -1980,14 +2072,6 @@ export class GlobeMap {
     return pov ? { lat: pov.lat, lon: pov.lng } : null;
   }
 
-  // ─── Resize ────────────────────────────────────────────────────────────────
-
-  public resize(): void {
-    if (!this.globe || this.destroyed) return;
-    this.wakeGlobe();
-    this.applyRenderQuality(undefined, this.container.clientWidth, this.container.clientHeight);
-  }
-
   // ─── State API ────────────────────────────────────────────────────────────
 
   public getState(): MapContainerState {
@@ -2002,10 +2086,22 @@ export class GlobeMap {
 
   public setTimeRange(range: TimeRange): void {
     this.timeRange = range;
+    this.flushMarkers();
+    this.flushArcs();
+    this.flushPaths();
+    this.onTimeRangeChange?.(range);
   }
 
   public getTimeRange(): TimeRange {
     return this.timeRange;
+  }
+
+  // ─── Resize ────────────────────────────────────────────────────────────────
+
+  public resize(): void {
+    if (!this.globe || this.destroyed) return;
+    this.wakeGlobe();
+    this.applyRenderQuality(undefined, this.container.clientWidth, this.container.clientHeight);
   }
 
   // ─── Callback setters ─────────────────────────────────────────────────────
@@ -2014,8 +2110,24 @@ export class GlobeMap {
     this.onHotspotClickCb = cb;
   }
 
-  public setOnCountryClick(_cb: (c: CountryClickPayload) => void): void {
-    // Globe country click not yet implemented — no-op
+  public setOnTimeRangeChange(cb: (r: TimeRange) => void): void {
+    this.onTimeRangeChange = cb;
+  }
+
+  public setOnStateChange(cb: (s: MapContainerState) => void): void {
+    this.onStateChange = cb;
+  }
+
+  public setOnSatelliteClick(cb: (sat: any) => void): void {
+    void cb;
+  }
+
+  public setOnCountryClick(cb: (c: CountryClickPayload) => void): void {
+    this.onCountryClick = cb;
+  }
+
+  public setOnLayerChange(cb: (layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void): void {
+    this.onLayerChangeCb = cb;
   }
 
   public setOnMapContextMenu(cb: (payload: { lat: number; lon: number; screenX: number; screenY: number }) => void): void {
@@ -2073,10 +2185,6 @@ export class GlobeMap {
   public setHotspotLevels(_l: Record<string, string>): void {}
   public initEscalationGetters(): void {}
   public highlightAssets(_assets: any): void {}
-  public setOnLayerChange(cb: (layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void): void {
-    this.onLayerChangeCb = cb;
-  }
-  public setOnTimeRangeChange(_cb: any): void {}
   public hideLayerToggle(layer: keyof MapLayers): void {
     this.layerTogglesEl?.querySelector(`.layer-toggle[data-layer="${layer}"]`)?.remove();
   }
@@ -2097,7 +2205,12 @@ export class GlobeMap {
       this.flushMarkers();
     }, durationMs);
   }
-  public triggerHotspotClick(_id: string): void {}
+  public triggerHotspotClick(id: string): void {
+    const h = this.hotspots.find(x => x.id === id);
+    if (h && this.onHotspotClickCb) {
+      this.onHotspotClickCb(h as any);
+    }
+  }
   public triggerConflictClick(_id: string): void {}
   public triggerBaseClick(_id: string): void {}
   public triggerPipelineClick(_id: string): void {}
@@ -2200,7 +2313,6 @@ export class GlobeMap {
       this.lastImageryCenter = { lat: center.lat, lon: center.lon };
     } catch { /* imagery is best-effort */ }
   }
-
   public setOutages(outages: InternetOutage[]): void {
     this.outageMarkers = (outages ?? []).filter(o => o.lat != null && o.lon != null).map(o => ({
       _kind: 'outage' as const,
@@ -2316,9 +2428,15 @@ export class GlobeMap {
   }
   public setPositiveEvents(_events: any[]): void {}
   public setKindnessData(_points: any[]): void {}
-  public setHappinessScores(_data: any): void {}
-  public setSpeciesRecoveryZones(_zones: any[]): void {}
-  public setRenewableInstallations(_installations: any[]): void {}
+  public setHappinessScores(data: any): void {
+    void data;
+  }
+  public setSpeciesRecoveryZones(zones: any[]): void {
+    void zones;
+  }
+  public setRenewableInstallations(installations: any[]): void {
+    void installations;
+  }
   public setCyberThreats(threats: CyberThreat[]): void {
     this.cyberMarkers = (threats ?? []).filter(t => t.lat != null && t.lon != null).map(t => ({
       _kind: 'cyber' as const,
@@ -2406,157 +2524,7 @@ export class GlobeMap {
     }));
     this.flushMarkers();
   }
-
-  private static latLngAltToVec3(lat: number, lng: number, alt: number, vec3Ctor: any): any {
-    const GLOBE_R = 100;
-    const r = GLOBE_R * (1 + alt / 6371);
-    const phi = (90 - lat) * (Math.PI / 180);
-    const theta = (90 - lng) * (Math.PI / 180);
-    const sinPhi = Math.sin(phi);
-    return new vec3Ctor(
-      r * sinPhi * Math.cos(theta),
-      r * Math.cos(phi),
-      r * sinPhi * Math.sin(theta),
-    );
-  }
-
-  private async rebuildSatBeams(positions: SatellitePosition[]): Promise<void> {
-    if (!this.globe || this.destroyed) return;
-    const THREE = await import('three');
-    const scene = this.globe.scene();
-
-    if (this.satBeamGroup) {
-      scene.remove(this.satBeamGroup);
-      this.satBeamGroup.traverse((child: any) => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) child.material.dispose();
-      });
-    }
-    this.satBeamGroup = new THREE.Group();
-    this.satBeamGroup.name = 'satBeams';
-
-    if (!this.layers.satellites || positions.length === 0) return;
-
-    const colorMap: Record<string, number> = {
-      CN: 0xff2020, RU: 0xff8800, US: 0x4488ff, EU: 0x44cc44,
-      KR: 0xaa66ff, IN: 0xff66aa, TR: 0xff4466, OTHER: 0xccccff,
-    };
-
-    const RAY_COUNT = 6;
-    const GLOBE_R = 100;
-    const BEAM_HEIGHT = 25;
-    const GROUND_SPREAD_RAD = 4.0;
-
-    const allRayPositions: number[] = [];
-    const allRayColors: number[] = [];
-    const allConePositions: number[] = [];
-    const allConeColors: number[] = [];
-
-    const tmpColor = new THREE.Color();
-
-    for (const s of positions) {
-      const groundCenter = GlobeMap.latLngAltToVec3(s.lat, s.lng, 0, THREE.Vector3);
-      const beamTop = new THREE.Vector3().copy(groundCenter).normalize().multiplyScalar(GLOBE_R + BEAM_HEIGHT);
-
-      const hex = colorMap[s.country] ?? 0xccccff;
-      tmpColor.setHex(hex);
-      const r = tmpColor.r, g = tmpColor.g, b = tmpColor.b;
-
-      const dir = new THREE.Vector3().copy(groundCenter).normalize().negate();
-      const up = new THREE.Vector3(0, 1, 0);
-      if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0);
-      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
-      const forward = new THREE.Vector3().crossVectors(right, dir).normalize();
-
-      const groundPts: InstanceType<typeof THREE.Vector3>[] = [];
-      for (let i = 0; i < RAY_COUNT; i++) {
-        const angle = (i / RAY_COUNT) * Math.PI * 2;
-        const gp = new THREE.Vector3()
-          .copy(groundCenter)
-          .addScaledVector(right, Math.cos(angle) * GROUND_SPREAD_RAD)
-          .addScaledVector(forward, Math.sin(angle) * GROUND_SPREAD_RAD)
-          .normalize().multiplyScalar(GLOBE_R);
-        groundPts.push(gp);
-        allRayPositions.push(beamTop.x, beamTop.y, beamTop.z, gp.x, gp.y, gp.z);
-        allRayColors.push(r, g, b, r * 0.3, g * 0.3, b * 0.3);
-      }
-
-      for (let i = 0; i < RAY_COUNT; i++) {
-        const next = (i + 1) % RAY_COUNT;
-        const gi = groundPts[i]!;
-        const gn = groundPts[next]!;
-        allConePositions.push(
-          beamTop.x, beamTop.y, beamTop.z,
-          gi.x, gi.y, gi.z,
-          gn.x, gn.y, gn.z,
-        );
-        allConeColors.push(r, g, b, r * 0.2, g * 0.2, b * 0.2, r * 0.2, g * 0.2, b * 0.2);
-      }
-    }
-
-    if (allRayPositions.length > 0) {
-      const rayGeo = new THREE.BufferGeometry();
-      rayGeo.setAttribute('position', new THREE.Float32BufferAttribute(allRayPositions, 3));
-      rayGeo.setAttribute('color', new THREE.Float32BufferAttribute(allRayColors, 3));
-      const rayMat = new THREE.LineBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false,
-      });
-      this.satBeamGroup.add(new THREE.LineSegments(rayGeo, rayMat));
-    }
-
-    if (allConePositions.length > 0) {
-      const coneGeo = new THREE.BufferGeometry();
-      coneGeo.setAttribute('position', new THREE.Float32BufferAttribute(allConePositions, 3));
-      coneGeo.setAttribute('color', new THREE.Float32BufferAttribute(allConeColors, 3));
-      const coneMat = new THREE.MeshBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.1,
-        side: THREE.DoubleSide, depthWrite: false,
-      });
-      this.satBeamGroup.add(new THREE.Mesh(coneGeo, coneMat));
-    }
-
-    this.satBeamGroup.visible = !!this.layers.satellites;
-    scene.add(this.satBeamGroup);
-  }
-
-  public setSatellites(positions: SatellitePosition[]): void {
-    this.satelliteMarkers = positions.map(s => ({
-      _kind: 'satellite' as const,
-      _lat: s.lat,
-      _lng: s.lng,
-      id: s.noradId,
-      name: s.name,
-      country: s.country,
-      type: s.type,
-      alt: s.alt,
-      velocity: s.velocity,
-      inclination: s.inclination,
-    }));
-
-    this.satelliteFootprintMarkers = positions.map(s => ({
-      _kind: 'satFootprint' as const,
-      _lat: s.lat,
-      _lng: s.lng,
-      country: s.country,
-      noradId: s.noradId,
-    }));
-
-    this.satelliteTrailPaths = positions
-      .filter(s => s.trail && s.trail.length > 1)
-      .map(s => ({
-        id: `orbit-${s.noradId}`,
-        name: s.name,
-        points: [[s.lng, s.lat, s.alt], ...s.trail],
-        pathType: 'orbit' as const,
-        status: 'active',
-        country: s.country,
-      }));
-
-    this.rebuildSatBeams(positions);
-    this.flushMarkers();
-    this.flushPaths();
-  }
-  public setTechEvents(events: Array<{ id: string; title: string; lat: number; lng: number; country: string; daysUntil: number; [key: string]: any }>): void {
+  public setTechEvents(events: any[]): void {
     this.techMarkers = (events ?? []).filter(e => e.lat != null && e.lng != null).map(e => ({
       _kind: 'tech' as const,
       _lat: e.lat,
@@ -2568,11 +2536,38 @@ export class GlobeMap {
     }));
     this.flushMarkers();
   }
-  public onHotspotClicked(cb: (h: Hotspot) => void): void { this.onHotspotClickCb = cb; }
-  public onTimeRangeChanged(_cb: (r: TimeRange) => void): void {}
-  public onStateChanged(_cb: (s: MapContainerState) => void): void {}
-  public setOnCountry(_cb: any): void {}
+
+  public setSatellites(positions: SatellitePosition[]): void {
+    this.satelliteMarkers = (positions ?? []).filter(s => s.lat != null && s.lng != null).map(s => ({
+      _kind: 'satellite' as const,
+      _lat: s.lat,
+      _lng: s.lng,
+      id: s.noradId,
+      name: s.name,
+      country: s.country,
+      type: s.type,
+      alt: s.alt,
+      velocity: s.velocity,
+      inclination: s.inclination,
+    }));
+    this.flushMarkers();
+  }
+
+  public setAircraftPositions(positions: PositionSample[]): void {
+    this.aircraftMarkers = (positions ?? []).filter(p => p.lat != null && p.lon != null).map(p => ({
+      _kind: 'flight' as const, // We use 'flight' kind for visualization
+      _lat: p.lat,
+      _lng: p.lon,
+      id: p.icao24,
+      callsign: p.callsign,
+      type: 'commercial',
+      heading: p.trackDeg,
+    }));
+    this.flushMarkers();
+  }
+
   public getHotspotLevel(_id: string) { return 'low'; }
+
 
   private async applyEnhancedVisuals(): Promise<void> {
     if (!this.globe || this.destroyed) return;
@@ -2594,21 +2589,21 @@ export class GlobeMap {
       this.cyanLight.position.set(-10, -10, -10);
       scene.add(this.cyanLight);
 
-      const outerGeo = new THREE.SphereGeometry(2.15, 24, 24);
+      const outerGeo = new THREE.SphereGeometry(2.15, 64, 64);
       const outerMat = new THREE.MeshBasicMaterial({
         color: 0x00d4ff, side: THREE.BackSide, transparent: true, opacity: 0.15,
       });
       this.outerGlow = new THREE.Mesh(outerGeo, outerMat);
       scene.add(this.outerGlow);
 
-      const innerGeo = new THREE.SphereGeometry(2.08, 24, 24);
+      const innerGeo = new THREE.SphereGeometry(2.08, 64, 64);
       const innerMat = new THREE.MeshBasicMaterial({
         color: 0x00a8cc, side: THREE.BackSide, transparent: true, opacity: 0.1,
       });
       this.innerGlow = new THREE.Mesh(innerGeo, innerMat);
       scene.add(this.innerGlow);
 
-      const starCount = 600;
+      const starCount = 2000;
       const starPositions = new Float32Array(starCount * 3);
       const starColors = new Float32Array(starCount * 3);
       for (let i = 0; i < starCount; i++) {
@@ -2644,7 +2639,6 @@ export class GlobeMap {
     };
     animateExtras();
   }
-
   private removeEnhancedVisuals(): void {
     if (!this.globe) return;
     if (this.extrasAnimFrameId != null) {
@@ -2734,53 +2728,7 @@ export class GlobeMap {
     }
   }
 
-  // ─── Idle rendering control ──────────────────────────────────────────────
-  // globe.gl runs requestAnimationFrame at 60fps continuously.
-  // Pause when idle to save CPU; resume on interaction or data change.
 
-  private wakeGlobe(): void {
-    if (this.destroyed || !this.globe) return;
-    if (!this.isGlobeAnimating) {
-      this.isGlobeAnimating = true;
-      try { (this.globe as any).resumeAnimation?.(); } catch { /* best-effort */ }
-    }
-    this.scheduleIdlePause();
-  }
-
-  private scheduleIdlePause(): void {
-    if (this.idleTimer) clearTimeout(this.idleTimer);
-    // After 3 seconds of no interaction/data change, pause rendering
-    this.idleTimer = setTimeout(() => {
-      if (this.destroyed || !this.globe || this.renderPaused) return;
-      // Don't pause if auto-rotate is active (user expects continuous spin)
-      if (this.controls?.autoRotate) return;
-      this.isGlobeAnimating = false;
-      try { (this.globe as any).pauseAnimation?.(); } catch { /* best-effort */ }
-    }, 3000);
-  }
-
-  private setupVisibilityHandler(): void {
-    this.visibilityHandler = () => {
-      if (document.hidden) {
-        if (this.isGlobeAnimating && this.globe) {
-          this.isGlobeAnimating = false;
-          try { (this.globe as any).pauseAnimation?.(); } catch { /* ignore */ }
-        }
-        if (this.extrasAnimFrameId != null) {
-          cancelAnimationFrame(this.extrasAnimFrameId);
-          this.extrasAnimFrameId = null;
-        }
-      } else {
-        this.wakeGlobe();
-        if (this.outerGlow && this.extrasAnimFrameId == null) {
-          this.startExtrasLoop();
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', this.visibilityHandler);
-  }
-
-  // ─── Destroy ──────────────────────────────────────────────────────────────
 
   public destroy(): void {
     this.container.removeEventListener('contextmenu', this.handleContextMenu);
@@ -2840,7 +2788,7 @@ export class GlobeMap {
     this.controlsDampingBeforePause = null;
     this.layerTogglesEl = null;
     if (this.globe) {
-      try { this.globe._destructor(); } catch { /* ignore */ }
+      try { (this.globe as any)._destructor(); } catch { /* ignore */ }
       this.globe = null;
     }
     this.container.innerHTML = '';

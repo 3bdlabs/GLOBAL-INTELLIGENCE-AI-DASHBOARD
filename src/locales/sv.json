@@ -1,4 +1,4 @@
-{
+﻿{
   "panels": {
     "liveNews": "Live Nyheter",
     "markets": "Marknader",
@@ -558,6 +558,7 @@
         "pipelines": "Rörledningar",
         "militaryActivity": "Militär aktivitet",
         "shipTraffic": "Fartygstrafik",
+        "aviation": "Luftfart",
         "flightDelays": "Flygförseningar",
         "protests": "Protester",
         "ucdpEvents": "UCDP-evenemang",

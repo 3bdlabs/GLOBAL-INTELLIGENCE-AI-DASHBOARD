@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "AI驱动的全球态势感知"
@@ -1027,6 +1027,7 @@
         "pipelines": "管道",
         "militaryActivity": "军事活动",
         "shipTraffic": "船舶交通",
+        "aviation": "航空",
         "flightDelays": "航班延误",
         "protests": "抗议活动",
         "ucdpEvents": "UCDP事件",

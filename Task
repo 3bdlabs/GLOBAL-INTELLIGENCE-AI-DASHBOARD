@@ -1,0 +1,29 @@
+# Implement Strategic Analytics, Predictive, and Advisory Layer
+
+- [x] Phase 1: Docker & Network Config
+  - [x] Update docker-compose.yml to set backend `extra_hosts` to `host.docker.internal:host-gateway`.
+  - [x] Add `OLLAMA_BASE_URL=http://host.docker.internal:11434` to backend environment variables in `docker-compose.yml` (or similar env file if appropriate).
+
+- [x] Phase 2: The Backend (The Aggregator)
+  - [x] Create `src/services/analyticsManager.ts` (or backend equivalent location) to collect text summaries into a "Global Context Buffer."
+  - [x] Add the endpoint `/api/v1/strategic-synthesis` to send the buffered context to Ollama for trend correlation and forecasting.
+
+- [x] Phase 3: The AI Logic (Master Analyst)
+  - [x] Formulate System Prompt for Ollama as "Lead Intelligence Director."
+  - [x] Structure JSON output to match requirements (`trend_correlation`, `seven_day_forecast`, `advisor_strategy`, `confidence_score`).
+
+- [x] Phase 4: The UI (Intelligence Panel)
+  - [x] Create `src/components/IntelligencePanel.tsx`.
+  - [x] Add the new tile in the dashboard grid.
+  - [x] Implement UI elements: Risk Meter (Gauge), Forecast text area, and Confidence progress bars.
+
+- [x] Phase 5: Rebuild & Validate
+  - [x] Provide command `docker-compose up -d --build`.
+  - [x] Verify the `/api/v1/strategic-synthesis` route is reachable from the frontend.
+
+- [x] Phase 6: Deployment & Verification
+  - [x] Execute `docker-compose up -d --build`.
+  - [x] Monitor logs for Ollama bridge success.
+  - [x] Verify UI at http://localhost:3000 via browser.
+  - [x] Confirm Strategic AI Synthesis panel functionality.
+  - [x] Take verification screenshot.

@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "สถานการณ์โลกพร้อมข้อมูลเชิงลึกจาก AI"
@@ -1027,6 +1027,7 @@
         "pipelines": "ท่อส่ง",
         "militaryActivity": "กิจกรรมทางทหาร",
         "shipTraffic": "การจราจรทางเรือ",
+        "aviation": "การบิน",
         "flightDelays": "ความล่าช้าของเที่ยวบิน",
         "protests": "การประท้วง",
         "ucdpEvents": "เหตุการณ์ UCDP",

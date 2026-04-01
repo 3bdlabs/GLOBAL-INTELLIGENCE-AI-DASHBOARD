@@ -9,11 +9,11 @@ import type {
   ListCommodityQuotesResponse,
   CommodityQuote,
 } from '../../../../src/generated/server/worldmonitor/market/v1/service_server';
-import { fetchYahooQuotesBatch, parseStringArray } from './_shared';
+import { fetchYahooQuoteCommodity, parseStringArray } from './_shared';
 import { cachedFetchJson, getCachedJson } from '../../../_shared/redis';
 
 const REDIS_CACHE_KEY = 'market:commodities:v1';
-const REDIS_CACHE_TTL = 600; // 10 min — commodities move slower than indices
+const REDIS_CACHE_TTL = 7200; // 2 hours — commodities move slowly; survive Yahoo rate-limit windows
 
 const fallbackCommodityCache = new Map<string, { data: ListCommodityQuotesResponse; ts: number }>();
 
@@ -44,10 +44,9 @@ export async function listCommodityQuotes(
 
   try {
   const result = await cachedFetchJson<ListCommodityQuotesResponse>(redisKey, REDIS_CACHE_TTL, async () => {
-    const batch = await fetchYahooQuotesBatch(symbols);
     const quotes: CommodityQuote[] = [];
     for (const s of symbols) {
-      const yahoo = batch.results.get(s);
+      const yahoo = await fetchYahooQuoteCommodity(s);
       if (yahoo) {
         quotes.push({ symbol: s, name: s, display: s, price: yahoo.price, change: yahoo.change, sparkline: yahoo.sparkline });
       }

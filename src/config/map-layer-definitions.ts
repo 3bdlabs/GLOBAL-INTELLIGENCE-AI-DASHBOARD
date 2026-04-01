@@ -41,7 +41,7 @@ export const LAYER_REGISTRY: Record<keyof MapLayers, LayerDefinition> = {
   military:                 def('military',                 '&#9992;',   'militaryActivity',         'Military Activity'),
   ais:                      def('ais',                      '&#128674;', 'shipTraffic',              'Ship Traffic'),
   tradeRoutes:              def('tradeRoutes',              '&#9875;',   'tradeRoutes',              'Trade Routes'),
-  flights:                  def('flights',                  '&#9992;',   'flightDelays',             'Aviation'),
+  flights:                  def('flights',                  '&#9992;',   'aviation',                 'Aviation'),
   protests:                 def('protests',                 '&#128226;', 'protests',                 'Protests'),
   ucdpEvents:               def('ucdpEvents',               '&#9876;',   'ucdpEvents',               'Armed Conflict Events'),
   displacement:             def('displacement',             '&#128101;', 'displacementFlows',        'Displacement Flows'),
@@ -117,7 +117,6 @@ const SVG_ONLY_LAYERS: Partial<Record<MapVariant, Array<keyof MapLayers>>> = {
   finance: ['sanctions'],
   commodity: ['sanctions'],
 };
-
 const I18N_PREFIX = 'components.deckgl.layers.';
 
 export function getLayersForVariant(variant: MapVariant, renderer: MapRenderer): LayerDefinition[] {

@@ -1,0 +1,37 @@
+# Walkthrough: Branding & Header Modularization (v0.2.0-alpha)
+
+This update establishes the new identity for the **GLOBAL INTELLIGENCE** dashboard and refactors the header into a modular Preact component.
+
+## Key Changes
+
+### 1. Branding Update: "GLOBAL INTELLIGENCE"
+- Replaced all legacy "MONITOR" branding with "GLOBAL INTELLIGENCE".
+- Updated `index.html` (title, meta tags, schema).
+- Updated `src/config/variant-meta.ts` for consistent site-wide naming.
+- Updated the main logo in the new `Header` component.
+
+### 2. Dynamic Versioning (v0.2.0-alpha)
+- Established `v0.2.0-alpha` as the system version.
+- Modified the `Header` component to dynamically import the version from `package.json`.
+- Updated `VERSION`, `CHANGELOG.md`, `package.json`, and `src-tauri/tauri.conf.json`.
+
+### 3. Modular Preact Header Component
+- Created `src/components/Header.tsx` as a standalone Preact component.
+- Extracted all header logic from `src/app/panel-layout.ts`, including:
+    - Variant Switcher (World, Tech, Finance, Happy).
+    - Social Links (X, GitHub).
+    - Status Indicator & Region Selector.
+    - Theme Toggle & Control Buttons.
+- Integrated the component into the layout via a mount point and `render` call, ensuring a clean separation of concerns.
+
+## Verification Results
+
+### Final V0.2.0-alpha Branding
+![Final Branding Success](file:///C:/Users/USER/.gemini/antigravity/brain/4e1168a2-212e-400e-b1af-bbedb4ea849a/branding_verification_success_1772668400959.webp)
+
+> [!NOTE]
+> The verification was performed after a full Docker rebuild (`docker-compose up -d --build`) to ensure all source code changes were correctly compiled and served.
+
+- **Header Branding**: ✅ Confirmed "GLOBAL INTELLIGENCE" is visible.
+- **UI Version**: ✅ Confirmed "v0.2.0-alpha" is dynamically rendered.
+- **Functionality**: ✅ Variant switcher, search modal, and controls are fully operational.

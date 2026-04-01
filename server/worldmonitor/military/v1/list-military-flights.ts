@@ -6,7 +6,7 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/military/v1/service_server';
 
 import { isMilitaryCallsign, isMilitaryHex, detectAircraftType, UPSTREAM_TIMEOUT_MS } from './_shared';
-import { CHROME_UA } from '../../../_shared/constants';
+import { CHROME_UA, getRelayBaseUrl, getRelayHeaders } from '../../../_shared/constants';
 import { cachedFetchJson } from '../../../_shared/redis';
 import { markNoCacheResponse } from '../../../_shared/response-headers';
 
@@ -24,19 +24,7 @@ interface RequestBounds {
   east: number;
 }
 
-function getRelayRequestHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': CHROME_UA,
-  };
-  const relaySecret = process.env.RELAY_SHARED_SECRET;
-  if (relaySecret) {
-    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
-    headers[relayHeader] = relaySecret;
-    headers.Authorization = `Bearer ${relaySecret}`;
-  }
-  return headers;
-}
+// Relay helpers removed - using centralized ones from ../../../_shared/constants
 
 function normalizeBounds(req: ListMilitaryFlightsRequest): RequestBounds {
   return {
@@ -93,7 +81,7 @@ export async function listMilitaryFlights(
         const isSidecar = (process.env.LOCAL_API_MODE || '').includes('sidecar');
         const baseUrl = isSidecar
           ? 'https://opensky-network.org/api/states/all'
-          : process.env.WS_RELAY_URL ? process.env.WS_RELAY_URL + '/opensky' : null;
+          : getRelayBaseUrl() ? getRelayBaseUrl() + '/opensky' : null;
 
         if (!baseUrl) return null;
 
@@ -111,7 +99,7 @@ export async function listMilitaryFlights(
 
         const url = `${baseUrl!}${params.toString() ? '?' + params.toString() : ''}`;
         const resp = await fetch(url, {
-          headers: getRelayRequestHeaders(),
+          headers: getRelayHeaders(),
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
 

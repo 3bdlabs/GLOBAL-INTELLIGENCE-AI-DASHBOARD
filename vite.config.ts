@@ -6,6 +6,7 @@ import { brotliCompress } from 'zlib';
 import { promisify } from 'util';
 import pkg from './package.json';
 import { VARIANT_META } from './src/config/variant-meta';
+import { handleStrategicSynthesis } from './server/strategic-synthesis';
 
 const isE2E = process.env.VITE_E2E === '1';
 const isDesktopBuild = process.env.VITE_DESKTOP_RUNTIME === '1';
@@ -198,54 +199,54 @@ function sebufApiPlugin(): Plugin {
       supplyChainServerMod, supplyChainHandlerMod,
       naturalServerMod, naturalHandlerMod,
     ] = await Promise.all([
-        import('./server/router'),
-        import('./server/cors'),
-        import('./server/error-mapper'),
-        import('./src/generated/server/worldmonitor/seismology/v1/service_server'),
-        import('./server/worldmonitor/seismology/v1/handler'),
-        import('./src/generated/server/worldmonitor/wildfire/v1/service_server'),
-        import('./server/worldmonitor/wildfire/v1/handler'),
-        import('./src/generated/server/worldmonitor/climate/v1/service_server'),
-        import('./server/worldmonitor/climate/v1/handler'),
-        import('./src/generated/server/worldmonitor/prediction/v1/service_server'),
-        import('./server/worldmonitor/prediction/v1/handler'),
-        import('./src/generated/server/worldmonitor/displacement/v1/service_server'),
-        import('./server/worldmonitor/displacement/v1/handler'),
-        import('./src/generated/server/worldmonitor/aviation/v1/service_server'),
-        import('./server/worldmonitor/aviation/v1/handler'),
-        import('./src/generated/server/worldmonitor/research/v1/service_server'),
-        import('./server/worldmonitor/research/v1/handler'),
-        import('./src/generated/server/worldmonitor/unrest/v1/service_server'),
-        import('./server/worldmonitor/unrest/v1/handler'),
-        import('./src/generated/server/worldmonitor/conflict/v1/service_server'),
-        import('./server/worldmonitor/conflict/v1/handler'),
-        import('./src/generated/server/worldmonitor/maritime/v1/service_server'),
-        import('./server/worldmonitor/maritime/v1/handler'),
-        import('./src/generated/server/worldmonitor/cyber/v1/service_server'),
-        import('./server/worldmonitor/cyber/v1/handler'),
-        import('./src/generated/server/worldmonitor/economic/v1/service_server'),
-        import('./server/worldmonitor/economic/v1/handler'),
-        import('./src/generated/server/worldmonitor/infrastructure/v1/service_server'),
-        import('./server/worldmonitor/infrastructure/v1/handler'),
-        import('./src/generated/server/worldmonitor/market/v1/service_server'),
-        import('./server/worldmonitor/market/v1/handler'),
-        import('./src/generated/server/worldmonitor/news/v1/service_server'),
-        import('./server/worldmonitor/news/v1/handler'),
-        import('./src/generated/server/worldmonitor/intelligence/v1/service_server'),
-        import('./server/worldmonitor/intelligence/v1/handler'),
-        import('./src/generated/server/worldmonitor/military/v1/service_server'),
-        import('./server/worldmonitor/military/v1/handler'),
-        import('./src/generated/server/worldmonitor/positive_events/v1/service_server'),
-        import('./server/worldmonitor/positive-events/v1/handler'),
-        import('./src/generated/server/worldmonitor/giving/v1/service_server'),
-        import('./server/worldmonitor/giving/v1/handler'),
-        import('./src/generated/server/worldmonitor/trade/v1/service_server'),
-        import('./server/worldmonitor/trade/v1/handler'),
-        import('./src/generated/server/worldmonitor/supply_chain/v1/service_server'),
-        import('./server/worldmonitor/supply-chain/v1/handler'),
-        import('./src/generated/server/worldmonitor/natural/v1/service_server'),
-        import('./server/worldmonitor/natural/v1/handler'),
-      ]);
+      import('./server/router'),
+      import('./server/cors'),
+      import('./server/error-mapper'),
+      import('./src/generated/server/worldmonitor/seismology/v1/service_server'),
+      import('./server/worldmonitor/seismology/v1/handler'),
+      import('./src/generated/server/worldmonitor/wildfire/v1/service_server'),
+      import('./server/worldmonitor/wildfire/v1/handler'),
+      import('./src/generated/server/worldmonitor/climate/v1/service_server'),
+      import('./server/worldmonitor/climate/v1/handler'),
+      import('./src/generated/server/worldmonitor/prediction/v1/service_server'),
+      import('./server/worldmonitor/prediction/v1/handler'),
+      import('./src/generated/server/worldmonitor/displacement/v1/service_server'),
+      import('./server/worldmonitor/displacement/v1/handler'),
+      import('./src/generated/server/worldmonitor/aviation/v1/service_server'),
+      import('./server/worldmonitor/aviation/v1/handler'),
+      import('./src/generated/server/worldmonitor/research/v1/service_server'),
+      import('./server/worldmonitor/research/v1/handler'),
+      import('./src/generated/server/worldmonitor/unrest/v1/service_server'),
+      import('./server/worldmonitor/unrest/v1/handler'),
+      import('./src/generated/server/worldmonitor/conflict/v1/service_server'),
+      import('./server/worldmonitor/conflict/v1/handler'),
+      import('./src/generated/server/worldmonitor/maritime/v1/service_server'),
+      import('./server/worldmonitor/maritime/v1/handler'),
+      import('./src/generated/server/worldmonitor/cyber/v1/service_server'),
+      import('./server/worldmonitor/cyber/v1/handler'),
+      import('./src/generated/server/worldmonitor/economic/v1/service_server'),
+      import('./server/worldmonitor/economic/v1/handler'),
+      import('./src/generated/server/worldmonitor/infrastructure/v1/service_server'),
+      import('./server/worldmonitor/infrastructure/v1/handler'),
+      import('./src/generated/server/worldmonitor/market/v1/service_server'),
+      import('./server/worldmonitor/market/v1/handler'),
+      import('./src/generated/server/worldmonitor/news/v1/service_server'),
+      import('./server/worldmonitor/news/v1/handler'),
+      import('./src/generated/server/worldmonitor/intelligence/v1/service_server'),
+      import('./server/worldmonitor/intelligence/v1/handler'),
+      import('./src/generated/server/worldmonitor/military/v1/service_server'),
+      import('./server/worldmonitor/military/v1/handler'),
+      import('./src/generated/server/worldmonitor/positive_events/v1/service_server'),
+      import('./server/worldmonitor/positive-events/v1/handler'),
+      import('./src/generated/server/worldmonitor/giving/v1/service_server'),
+      import('./server/worldmonitor/giving/v1/handler'),
+      import('./src/generated/server/worldmonitor/trade/v1/service_server'),
+      import('./server/worldmonitor/trade/v1/handler'),
+      import('./src/generated/server/worldmonitor/supply_chain/v1/service_server'),
+      import('./server/worldmonitor/supply-chain/v1/handler'),
+      import('./src/generated/server/worldmonitor/natural/v1/service_server'),
+      import('./server/worldmonitor/natural/v1/handler'),
+    ]);
 
     const serverOptions = { onError: errorMod.mapErrorToResponse };
     const allRoutes = [
@@ -600,6 +601,44 @@ function gpsjamDevPlugin(): Plugin {
   };
 }
 
+function strategicAiPlugin(): Plugin {
+  return {
+    name: 'strategic-ai',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (req.url === '/api/v1/strategic-synthesis' && req.method === 'POST') {
+          try {
+            // Read body for the handler
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) {
+              chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+            const body = Buffer.concat(chunks).toString();
+
+            // Re-wrap in a Request object for the handler
+            const webRequest = new Request('http://localhost/api/v1/strategic-synthesis', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body
+            });
+
+            const response = await handleStrategicSynthesis(webRequest);
+            res.statusCode = response.status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(await response.text());
+          } catch (err) {
+            console.error('[strategic-ai] Plugin error:', err);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: 'Plugin error' }));
+          }
+        } else {
+          next();
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -611,6 +650,7 @@ export default defineConfig({
     youtubeLivePlugin(),
     gpsjamDevPlugin(),
     sebufApiPlugin(),
+    strategicAiPlugin(),
     brotliPrecompressPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -747,80 +787,9 @@ export default defineConfig({
       ),
     },
   },
-  build: {
-    // Geospatial bundles (maplibre/deck) are expected to be large even when split.
-    // Raise warning threshold to reduce noisy false alarms in CI.
-    chunkSizeWarningLimit: 1200,
-    rollupOptions: {
-      onwarn(warning, warn) {
-        // onnxruntime-web ships a minified browser bundle that intentionally uses eval.
-        // Keep build logs focused by filtering this known third-party warning only.
-        if (
-          warning.code === 'EVAL'
-          && typeof warning.id === 'string'
-          && warning.id.includes('/onnxruntime-web/dist/ort-web.min.js')
-        ) {
-          return;
-        }
-
-        warn(warning);
-      },
-      input: {
-        main: resolve(__dirname, 'index.html'),
-        settings: resolve(__dirname, 'settings.html'),
-        liveChannels: resolve(__dirname, 'live-channels.html'),
-      },
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('/@xenova/transformers/')) {
-              return 'transformers';
-            }
-            if (id.includes('/onnxruntime-web/')) {
-              return 'onnxruntime';
-            }
-            if (id.includes('/maplibre-gl/') || id.includes('/pmtiles/') || id.includes('/@protomaps/basemaps/')) {
-              return 'maplibre';
-            }
-            if (
-              id.includes('/@deck.gl/')
-              || id.includes('/@luma.gl/')
-              || id.includes('/@loaders.gl/')
-              || id.includes('/@math.gl/')
-              || id.includes('/h3-js/')
-            ) {
-              return 'deck-stack';
-            }
-            if (id.includes('/d3/')) {
-              return 'd3';
-            }
-            if (id.includes('/topojson-client/')) {
-              return 'topojson';
-            }
-            if (id.includes('/i18next')) {
-              return 'i18n';
-            }
-            if (id.includes('/@sentry/')) {
-              return 'sentry';
-            }
-          }
-          if (id.includes('/src/components/') && id.endsWith('Panel.ts')) {
-            return 'panels';
-          }
-          // Give lazy-loaded locale chunks a recognizable prefix so the
-          // service worker can exclude them from precache (en.json is
-          // statically imported into the main bundle).
-          const localeMatch = id.match(/\/locales\/(\w+)\.json$/);
-          if (localeMatch && localeMatch[1] !== 'en') {
-            return `locale-${localeMatch[1]}`;
-          }
-          return undefined;
-        },
-      },
-    },
-  },
   server: {
     port: 3000,
+    host: true,
     open: !isE2E,
     hmr: isE2E ? false : undefined,
     watch: {
@@ -831,6 +800,15 @@ export default defineConfig({
       ],
     },
     proxy: {
+      '/api/v1/acled': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/v1\/acled/, '/api/conflict/v1/list-acled-events'),
+      },
+      '/api/v1/strategic-synthesis': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
       // Yahoo Finance API
       '/api/yahoo': {
         target: 'https://query1.finance.yahoo.com',
@@ -1193,6 +1171,78 @@ export default defineConfig({
           proxy.on('error', (err) => {
             console.log('ADS-B Exchange proxy error:', err.message);
           });
+        },
+      },
+    },
+  },
+  build: {
+    // Geospatial bundles (maplibre/deck) are expected to be large even when split.
+    // Raise warning threshold to reduce noisy false alarms in CI.
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      onwarn(warning: any, warn: any) {
+        // onnxruntime-web ships a minified browser bundle that intentionally uses eval.
+        // Keep build logs focused by filtering this known third-party warning only.
+        if (
+          warning.code === 'EVAL'
+          && typeof warning.id === 'string'
+          && warning.id.includes('/onnxruntime-web/dist/ort-web.min.js')
+        ) {
+          return;
+        }
+
+        warn(warning);
+      },
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        settings: resolve(__dirname, 'settings.html'),
+        liveChannels: resolve(__dirname, 'live-channels.html'),
+      },
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules')) {
+            if (id.includes('/@xenova/transformers/')) {
+              return 'transformers';
+            }
+            if (id.includes('/onnxruntime-web/')) {
+              return 'onnxruntime';
+            }
+            if (id.includes('/maplibre-gl/') || id.includes('/pmtiles/') || id.includes('/@protomaps/basemaps/')) {
+              return 'maplibre';
+            }
+            if (
+              id.includes('/@deck.gl/')
+              || id.includes('/@luma.gl/')
+              || id.includes('/@loaders.gl/')
+              || id.includes('/@math.gl/')
+              || id.includes('/h3-js/')
+            ) {
+              return 'deck-stack';
+            }
+            if (id.includes('/d3/')) {
+              return 'd3';
+            }
+            if (id.includes('/topojson-client/')) {
+              return 'topojson';
+            }
+            if (id.includes('/i18next')) {
+              return 'i18n';
+            }
+            if (id.includes('/@sentry/')) {
+              return 'sentry';
+            }
+          }
+          if (id.includes('/src/components/') && id.endsWith('Panel.ts')) {
+            return 'panels';
+          }
+          // Give lazy-loaded locale chunks a recognizable prefix so the
+          // service worker can exclude them from precache (en.json is
+          // statically imported into the main bundle).
+          const localeMatch = id.match(/\/locales\/(\w+)\.json$/);
+          if (localeMatch && localeMatch[1] !== 'en') {
+            return `locale-${localeMatch[1]}`;
+          }
+          return undefined;
         },
       },
     },

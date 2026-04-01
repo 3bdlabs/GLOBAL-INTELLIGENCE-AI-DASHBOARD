@@ -1,0 +1,90 @@
+# v0.3.0-alpha — Upstream v2.6.0 Sync
+
+Syncs 6 upstream commits (PRs #1289–#1303) into our fork and bumps the internal version to `v0.3.0-alpha`.
+
+## Proposed Changes
+
+---
+
+### GlobeMap Performance & Stability
+Touches `src/components/GlobeMap.ts` — all three changes are additive.
+
+#### [MODIFY] [GlobeMap.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/components/GlobeMap.ts)
+
+**#1299 — WebGL context loss guard**
+- Add `private webglLost = false` field
+- Add `webglcontextlost` / `webglcontextrestored` handlers on the canvas element
+- Guard `flushMarkers()`, `flushMarkersImmediate()`, `flushArcs()`, `flushPaths()` with `|| this.webglLost` check
+
+**#1303 — Idle rendering (stop 60fps RAF when idle)**
+- Add `private idleTimer`, `private isGlobeAnimating`, `private visibilityHandler` fields
+- Add `scheduleIdlePause()` method — pauses globe animation after 3s of idle
+- Add `wakeGlobe()` method — resumes animation + resets idle timer
+- Add `setupVisibilityHandler()` — pauses on tab hide, wakes on tab show
+- Wire `wakeGlobe()` into canvas `mousedown`, `touchstart`, `wheel`, and throttled `mousemove` events
+- Call `scheduleIdlePause()` and `setupVisibilityHandler()` at end of constructor
+- Call `wakeGlobe()` at top of `flushMarkersImmediate()` and `flushArcs()`
+
+---
+
+### Layer Config Fix
+#### [MODIFY] [map-layer-definitions.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/config/map-layer-definitions.ts)
+
+**#1292 — Disable CII Instability layer in 3D/globe mode**
+- Change `ciiChoropleth` definition from `['flat', 'globe']` → `['flat']`
+- This hides the layer when in 3D mode (choropleth wraps globe incorrectly)
+
+---
+
+### Data Quality Fixes
+#### [MODIFY] [seed-military-flights.mjs](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/scripts/seed-military-flights.mjs)
+
+**#1294 — Tighten military callsign patterns**
+- Add `COMMERCIAL_CALLSIGNS` blocklist Set: `CCA, CHH, SVA, THY, THK, TUR, ELY, ELAL, UAE, QTR, ETH, SAA, PAK, AME, RED`
+- Tighten hex ranges for Spain (`350000–3503FF`), UAE (`896800–896BFF`), Qatar (`06A200–06A3FF`), Canada (`C2D000–C2DFFF`)
+- Tighten callsign regexes to require digits after prefix (e.g. `/^RCH\d/` instead of `/^RCH/`)
+
+---
+
+### Command Palette Additions
+#### [MODIFY] [commands.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/config/commands.ts)
+
+**#1289 — Add 16 missing layer toggles to Cmd+K**
+- Add 4 entries to `LAYER_KEY_MAP`: `gps`, `cii`, `iran`, `natural`
+- Add 16 `COMMANDS` entries for: GPS jamming, orbital surveillance, UCDP events, Iran attacks, gamma irradiators, spaceports, AI data centers, military activity, natural events, strategic waterways, economic centers, critical minerals, CII instability, day/night overlay, sanctions
+
+---
+
+### Version Bump
+#### [MODIFY] [package.json](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/package.json)
+- `version`: `0.2.2-alpha` → `0.3.0-alpha`
+- Add `_upstream: "v2.6.0"` tag
+
+#### [MODIFY] [VERSION](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/VERSION)
+- `0.2.2-alpha` → `0.3.0-alpha`
+
+#### [MODIFY] [variant-meta.ts](file:///d:/Dev/GLOBAL-INTELLIGENCE-AI-DASHBOARD/src/config/variant-meta.ts) *(or wherever version string is displayed)*
+- Update the displayed version string to show `v0.3.0-alpha`
+
+---
+
+## Verification Plan
+
+### Automated
+```bash
+npm run typecheck
+```
+Zero new errors expected from the modified files.
+
+### Docker Rebuild
+```bash
+docker-compose up -d --build --renew-anon-volumes backend
+```
+
+### Manual Verification (at http://localhost:3000)
+
+1. **WebGL Guard (`#1299`)**: Open DevTools → Console, check for no Globe-related uncaught errors on load
+2. **Idle Rendering (`#1303`)**: Leave the 3D globe open for 5 seconds without touching it — CPU usage should drop (visible in Task Manager); moving the mouse should resume animation
+3. **CII Layer in 3D (`#1292`)**: Switch to 3D mode, open the layers panel — "CII Instability" should be hidden/greyed out
+4. **Command Palette (`#1289`)**: Press `Cmd+K` (or `Ctrl+K`) → search "gps" → "Toggle GPS jamming" should appear
+5. **Version string**: Dashboard header should display `v0.3.0-alpha`

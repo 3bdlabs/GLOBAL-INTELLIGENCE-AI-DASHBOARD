@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "Situación global con información de IA"
@@ -869,6 +869,7 @@
         "pipelines": "Tuberías",
         "militaryActivity": "Actividad militar",
         "shipTraffic": "Tráfico de barcos",
+        "aviation": "Aviación",
         "flightDelays": "Retrasos de vuelos",
         "protests": "Protestas",
         "ucdpEvents": "Eventos de la UCDP",

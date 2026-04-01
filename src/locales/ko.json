@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "월드 모니터",
     "description": "AI 인사이트 기반 글로벌 상황"
@@ -1027,6 +1027,7 @@
         "pipelines": "파이프라인",
         "militaryActivity": "군사 활동",
         "shipTraffic": "선박 교통",
+        "aviation": "항공",
         "flightDelays": "항공 지연",
         "protests": "시위",
         "ucdpEvents": "UCDP 사건",

@@ -1,7 +1,7 @@
 /**
  * Shared helpers, types, and constants for the market service handler RPCs.
  */
-import { CHROME_UA, yahooGate } from '../../../_shared/constants';
+import { CHROME_UA, yahooGate, getRelayBaseUrl, getRelayHeaders } from '../../../_shared/constants';
 import cryptoConfig from '../../../../shared/crypto.json';
 import stablecoinConfig from '../../../../shared/stablecoins.json';
 
@@ -9,23 +9,7 @@ import stablecoinConfig from '../../../../shared/stablecoins.json';
 // Relay helpers (Railway proxy for Yahoo when Vercel IPs are rate-limited)
 // ========================================================================
 
-function getRelayBaseUrl(): string | null {
-  const relayUrl = process.env.WS_RELAY_URL;
-  if (!relayUrl) return null;
-  return relayUrl
-    .replace(/^ws(s?):\/\//, 'http$1://')
-    .replace(/\/$/, '');
-}
-
-function getRelayHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'User-Agent': CHROME_UA };
-  const relaySecret = process.env.RELAY_SHARED_SECRET;
-  if (relaySecret) {
-    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
-    headers[relayHeader] = relaySecret;
-  }
-  return headers;
-}
+// Relay helpers removed - using centralized ones from ../../../_shared/constants
 
 // ========================================================================
 // Constants
@@ -195,7 +179,7 @@ export async function fetchYahooQuote(
   // Try direct Yahoo first
   try {
     await yahooGate();
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=15m`;
     const resp = await fetch(url, {
       headers: { 'User-Agent': CHROME_UA },
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -218,7 +202,7 @@ export async function fetchYahooQuote(
     return null;
   }
   try {
-    const relayUrl = `${relayBase}/yahoo-chart?symbol=${encodeURIComponent(symbol)}`;
+    const relayUrl = `${relayBase}/yahoo-chart?symbol=${encodeURIComponent(symbol)}&range=1d&interval=15m`;
     const resp = await fetch(relayUrl, {
       headers: getRelayHeaders(),
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -233,6 +217,59 @@ export async function fetchYahooQuote(
     console.warn(`[Yahoo] ${symbol} relay error:`, (err as Error).message);
     return null;
   }
+}
+
+/**
+ * Commodity-optimised variant: tries the relay FIRST (to avoid IP-level 429 blocks on
+ * futures/index symbols), then falls back to direct Yahoo if relay is unavailable.
+ */
+export async function fetchYahooQuoteCommodity(
+  symbol: string,
+): Promise<{ price: number; change: number; sparkline: number[] } | null> {
+  const relayBase = getRelayBaseUrl();
+
+  // Try relay first for commodity symbols — relay has a better hit rate than direct
+  if (relayBase) {
+    try {
+      const relayUrl = `${relayBase}/yahoo-chart?symbol=${encodeURIComponent(symbol)}&range=1d&interval=15m`;
+      const resp = await fetch(relayUrl, {
+        headers: getRelayHeaders(),
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      });
+      if (resp.ok) {
+        const data: YahooChartResponse = await resp.json();
+        const parsed = parseYahooChartResponse(data);
+        if (parsed) {
+          console.log(`[Yahoo] ${symbol} relay hit`);
+          return parsed;
+        }
+      } else {
+        console.warn(`[Yahoo] ${symbol} relay HTTP ${resp.status}`);
+      }
+    } catch (err) {
+      console.warn(`[Yahoo] ${symbol} relay error:`, (err as Error).message);
+    }
+  }
+
+  // Fallback: direct Yahoo
+  try {
+    await yahooGate();
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=15m`;
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+    if (resp.ok) {
+      const data: YahooChartResponse = await resp.json();
+      return parseYahooChartResponse(data);
+    } else {
+      console.warn(`[Yahoo] ${symbol} direct HTTP ${resp.status}`);
+    }
+  } catch (err) {
+    console.warn(`[Yahoo] ${symbol} direct error:`, (err as Error).message);
+  }
+
+  return null;
 }
 
 // ========================================================================

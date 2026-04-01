@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "title": "World Monitor",
     "description": "Globální situace s postřehy umělé inteligence"
@@ -1017,6 +1017,7 @@
         "pipelines": "Potrubí",
         "militaryActivity": "Vojenská aktivita",
         "shipTraffic": "Lodní doprava",
+        "aviation": "Letectví",
         "flightDelays": "Zpoždění letů",
         "protests": "Protesty",
         "ucdpEvents": "UCDP události",
